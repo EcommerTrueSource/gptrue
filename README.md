@@ -23,7 +23,7 @@ O GPTrue é um chatbot generativo integrado ao "Painel True", desenvolvido para 
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/seu-usuario/gptrue.git
+git clone https://github.com/EcommerTrueSource/gptrue.git
 cd gptrue
 ```
 
