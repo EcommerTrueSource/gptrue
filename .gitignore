@@ -1,0 +1,78 @@
+# compiled output
+/dist
+/node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Environment variables
+.env
+.env.*
+!.env.example
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Google Cloud credentials
+*credentials*.json
+*key*.json
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Build files
+build/
+dist/
+out/
+
+# Debug files
+debug/
+.debug/
+
+# Local development
+docker-compose.override.yml
+.docker/
+
+# Pinecone and other service credentials
+*.pem
+*.key
+*.crt
+*.cert
+
+# Misc
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

@@ -1,0 +1,562 @@
+# Projeto GPTrue - Chatbot Generativo para Análise de Dados de E-commerce
+
+## Descrição do projeto
+O GPTrue é um chatbot generativo integrado ao "Painel True", desenvolvido para fornecer insights e análises sobre dados de e-commerce armazenados no BigQuery. O sistema permite que usuários façam perguntas em linguagem natural sobre pedidos, produtos, vendas, assinantes, e outras métricas de negócio, e recebam respostas contextualizadas baseadas nos dados reais da plataforma. O sistema utiliza uma combinação de busca vetorial e geração dinâmica de consultas SQL para fornecer respostas precisas e eficientes, enquanto aprende continuamente através de feedback dos usuários.
+
+## Tecnologias principais
+- **Frontend**: NextJS 14+ com TypeScript, hospedado na Vercel
+- **Backend**: NestJS 10+ (Framework Node.js) com TypeScript
+- **Vector Store**: Pinecone para armazenamento e busca semântica
+- **Banco de dados**: Google BigQuery para armazenamento e consulta dos dados de e-commerce
+- **IA Generativa**: Google Vertex AI para geração de consultas SQL, OpenAI API (GPT-4) para geração de respostas em linguagem natural
+- **Orquestração**: LangChain para fluxos de processamento de linguagem natural
+- **Containerização**: Docker para desenvolvimento e produção
+- **CI/CD**: GitHub Actions para integração e entrega contínua
+
+## Arquitetura detalhada
+O sistema segue uma arquitetura de microserviços modular, com componentes específicos responsáveis por diferentes etapas do fluxo de processamento:
+
+1. **API Gateway** (NestJS)
+   - Gerencia autenticação JWT e autorização
+   - Implementa rate limiting e proteção contra abusos
+   - Roteamento de requisições para os serviços apropriados
+   - Gestão de logs de entrada/saída e monitoramento
+
+2. **Orchestrator Service** (NestJS + LangChain)
+   - Coordena o fluxo completo de processamento de perguntas
+   - Determina a rota de processamento (cache vs. consulta dinâmica)
+   - Gerencia o estado da conversa e contexto
+   - Controla timeouts e fallbacks
+
+3. **Semantic Cache Service** (NestJS + Pinecone)
+   - Interface com o Pinecone Vector Database
+   - Armazena e recupera templates de perguntas/respostas anteriores
+   - Implementa cálculo de similaridade semântica (limiar 0.85)
+   - Gerencia metadados e ciclo de vida do cache
+
+4. **Query Generator Service** (NestJS + Vertex AI)
+   - Traduz perguntas em linguagem natural para consultas SQL
+   - Mantém contexto das tabelas e schema do BigQuery
+   - Implementa prompts específicos para geração de SQL válido
+   - Aplica restrições de segurança nas consultas geradas
+
+5. **Query Validator Service** (NestJS)
+   - Analisa e valida sintaticamente as consultas SQL geradas
+   - Verifica conformidade com políticas de segurança
+   - Estima custos e performance das consultas
+   - Aplica otimizações quando possível
+
+6. **BigQuery Connector Service** (NestJS)
+   - Gerencia conexão e autenticação com o BigQuery
+   - Executa consultas com gerenciamento de recursos
+   - Implementa timeouts e limites de consumo
+   - Formata resultados para processamento subsequente
+
+7. **Response Generator Service** (NestJS + OpenAI)
+   - Traduz resultados técnicos para linguagem natural contextualizada
+   - Formata respostas para diferentes tipos de dados (tabular, agregado, etc.)
+   - Adiciona contexto e explicações aos resultados
+   - Gera sugestões de perguntas relacionadas
+
+8. **Feedback Service** (NestJS)
+   - Coleta e processa feedback dos usuários (positivo/negativo)
+   - Atualiza templates no Pinecone com base no feedback
+   - Identifica padrões em feedbacks negativos
+   - Fornece métricas para melhoria contínua
+
+## Fluxo principal detalhado
+1. **Recebimento da Pergunta**
+   - O frontend envia a pergunta do usuário via API REST
+   - A pergunta é validada, normalizada e pré-processada
+   - O sistema identifica o contexto da pergunta (escopo de tabelas potencialmente relevantes)
+
+2. **Verificação no Cache Semântico**
+   - A pergunta é convertida em um embedding vetorial (1536 dimensões)
+   - O sistema busca no Pinecone por perguntas semanticamente similares
+   - Se uma correspondência for encontrada com similaridade > 0.85, retorna a resposta em cache
+   - Métricas de cache hit/miss são registradas para monitoramento
+
+3. **Geração de SQL (quando necessário)**
+   - Se não for encontrada correspondência no cache, o Query Generator Service é acionado
+   - O contexto completo das tabelas e schema é fornecido ao Vertex AI
+   - Um prompt especializado instrui o modelo a gerar uma consulta SQL válida
+   - A consulta gerada deve seguir restrições de segurança e performance
+
+4. **Validação e Execução da Query**
+   - O Query Validator Service verifica a sintaxe e segurança da consulta
+   - Estimativas de custo e recursos são calculadas
+   - Se válida e dentro dos limites, a consulta é executada no BigQuery
+   - Timeouts e limites de recursos são aplicados para proteger o sistema
+
+5. **Transformação do Resultado**
+   - Os resultados brutos do BigQuery são processados e formatados
+   - Metadados adicionais são incorporados (tempo de execução, tabelas usadas, etc.)
+   - O Response Generator Service converte os resultados para linguagem natural
+   - A resposta é estruturada para facilitar a compreensão do usuário
+
+6. **Armazenamento no Cache**
+   - Um novo template é criado contendo:
+     - Pergunta original e seu embedding
+     - Consulta SQL gerada
+     - Resultados brutos da consulta
+     - Resposta formatada em linguagem natural
+     - Metadados (timestamp, versão, tempo de execução, etc.)
+   - O template é armazenado no Pinecone para uso futuro
+
+7. **Retorno ao Usuário**
+   - A resposta final é enviada ao frontend
+   - Opções de feedback são incluídas (positivo/negativo/comentário)
+   - Sugestões de perguntas relacionadas são fornecidas
+   - Métricas de performance são registradas para análise
+
+8. **Processamento de Feedback**
+   - O feedback do usuário é coletado e armazenado
+   - Templates existentes no Pinecone são atualizados
+   - Feedback negativo é sinalizado para revisão
+   - Análise periódica de padrões de feedback informa melhorias
+
+## Esquema detalhado das tabelas BigQuery
+Cada tabela contém campos específicos que podem ser consultados pelo GPTrue:
+
+### 1. PEDIDOS
+- **Função**: Armazena informações sobre pedidos de venda realizados na plataforma.
+- **Campos principais**:
+  - `id_order_tiny`: Identificador único do pedido (STRING)
+  - `data_pedido`: Data e hora da realização do pedido (DATETIME)
+  - `data_entrega_prevista`: Data estimada para entrega (DATETIME)
+  - `situacao`: Status atual do pedido (STRING) - Ex: "Aguardando pagamento", "Pagamento aprovado", etc.
+  - `valor_frete`, `valor_desconto`, `total_produtos`, `total_pedido_pago`: Valores monetários (NUMERIC)
+  - `itensJSON`: Lista de produtos em formato JSON com detalhes de cada item
+  - `metodo_pagamento`: Forma de pagamento utilizada (STRING)
+  - `assinatura_boleano`: Indicador se o pedido é uma assinatura (BOOLEAN)
+  - `assinatura_frequencia`: Frequência da assinatura (STRING) - Ex: "30 dias", "60 dias", etc.
+  - `cuponsJSON`, `promocoesJSON`: Detalhes de cupons e promoções aplicados ao pedido
+  - Dados de localização: `bairro`, `cidade`, `uf`, `cep`
+
+### 2. PRODUTOS
+- **Função**: Catálogo de produtos disponíveis na plataforma.
+- **Campos principais**:
+  - `id`: Identificador único do SKU na VTEX (STRING)
+  - `ProductRefId`: Código do produto usado como SKU (STRING)
+  - `NameComplete`: Nome completo do produto (STRING)
+  - `ProductDescription`: Descrição detalhada (STRING)
+  - `BrandName`: Nome da marca (STRING)
+  - `IsActive`: Indicador se o produto está ativo (BOOLEAN)
+  - `preco_custo_medio`: Custo médio para a empresa (NUMERIC)
+  - `saldo_estoque`: Quantidade disponível (NUMERIC)
+  - `dias_zerado`: Número de dias sem estoque (NUMERIC)
+  - Dimensões: `Dimension_height`, `Dimension_length`, `Dimension_weight`, `Dimension_width`
+  - `ProductCategories`: Categorias às quais o produto pertence (ARRAY)
+
+### 3. ASSINATURA
+- **Função**: Gerencia produtos em regime de assinatura (recorrentes).
+- **Campos principais**:
+  - `id`: Identificador único da assinatura (STRING)
+  - `customerId`: ID do cliente associado (STRING)
+  - `customerEmail`: Email do cliente (STRING)
+  - `status`: Estado atual - "active", "paused", "canceled" (STRING)
+  - `nextPurchaseDate`: Data da próxima compra prevista (STRING)
+  - `lastPurchaseDate`: Data da última compra realizada (STRING)
+  - `plan`: Detalhes do plano de assinatura (RECORD)
+  - `cycleCount`: Número de ciclos já realizados (INTEGER)
+  - `items`: Lista de produtos incluídos na assinatura (REPEATED RECORD)
+
+### 4. CLIENTES
+- **Função**: Cadastro e informações de clientes da plataforma.
+- **Campos principais**:
+  - `clientProfileData_id`: ID único do perfil (STRING)
+  - `clientProfileData_email`: Email do cliente (STRING)
+  - `clientProfileData_firstName`, `clientProfileData_lastName`: Nome e sobrenome (STRING)
+  - `clientProfileData_document`: CPF ou CNPJ (STRING)
+  - `clientProfileData_phone`: Telefone (STRING)
+  - `status_cliente`: Status no sistema - "Ativo", "Inativo" (STRING)
+  - `status_assinante`: Indicador de assinatura (STRING)
+  - Localização: `bairro`, `cidade`, `uf`, `cep`
+
+### 5. STATUS_CLIENTES
+- **Função**: Monitoramento do status dos clientes (ativos = compra nos últimos 90 dias).
+- **Campos principais**:
+  - `email`: Email do cliente (STRING)
+  - `status`: Status - "ACTIVE", "INACTIVE" (STRING)
+  - `data_atualizacao_warehouse`: Data da última atualização (DATETIME)
+
+### 6. STATUS_ASSINANTES
+- **Função**: Histórico do status dos assinantes.
+- **Campos principais**:
+  - `customerId`: ID do cliente (STRING)
+  - `email`: Email do cliente (STRING)
+  - `status`: Status - "ACTIVE", "PAUSED", "CANCELED", "EXPIRED" (STRING)
+  - `data_atualizacao_warehouse`: Data da última atualização (DATETIME)
+
+## Tipos de consultas possíveis
+O GPTrue deve suportar diversos tipos de consultas, incluindo:
+
+1. **Consultas sobre produtos**
+   - Produtos mais vendidos em um período
+   - Status de estoque de produtos específicos
+   - Informações de preço e margens
+   - Categorias mais populares
+
+2. **Análise de pedidos**
+   - Volume de vendas por período
+   - Ticket médio
+   - Taxa de conversão de pedidos
+   - Efetividade de promoções e cupons
+
+3. **Análise de assinantes**
+   - Taxa de retenção de assinaturas
+   - Churn rate
+   - Lifetime value de assinantes
+   - Padrões de pause/cancel
+
+4. **Análise geográfica**
+   - Distribuição de clientes por região
+   - Performance de vendas por estado/cidade
+   - Custos de frete por região
+
+5. **Análise comportamental**
+   - Frequência de compra
+   - Produtos frequentemente comprados juntos
+   - Jornada do cliente (primeira compra até assinatura)
+
+## Modelos de dados e DTOs
+
+### API Request/Response
+```typescript
+// Requisição de conversa
+interface ConversationRequest {
+  message: string;                // Pergunta do usuário
+  conversationId?: string;        // ID da conversa (opcional)
+  context?: {                     // Contexto adicional (opcional)
+    timeRange?: {
+      start: Date;
+      end: Date;
+    };
+    filters?: Record<string, any>;
+  };
+}
+
+// Resposta da API
+interface ConversationResponse {
+  id: string;                     // ID da resposta
+  conversationId: string;         // ID da conversa
+  message: string;                // Resposta em linguagem natural
+  metadata: {
+    processingTimeMs: number;     // Tempo de processamento
+    source: 'cache' | 'query';    // Fonte da resposta
+    confidence: number;           // Confiança na resposta (0-1)
+    tables?: string[];            // Tabelas utilizadas
+    sql?: string;                 // SQL gerado (se solicitado)
+  };
+  data?: {                        // Dados estruturados (se aplicável)
+    type: 'table' | 'scalar' | 'chart';
+    content: any;
+  };
+  suggestions?: string[];         // Sugestões de perguntas relacionadas
+  feedbackOptions: {              // Opções de feedback
+    thumbsUp: boolean;            // Botão de feedback positivo
+    thumbsDown: boolean;          // Botão de feedback negativo
+    commentEnabled: boolean;      // Campo de comentário habilitado
+  };
+}
+```
+
+### Template de Cache (Pinecone)
+```typescript
+interface CacheTemplate {
+  id: string;                     // ID único do template
+  question: string;               // Pergunta original do usuário
+  questionEmbedding: number[];    // Vetor de embedding da pergunta
+  query?: string;                 // Consulta SQL gerada
+  queryResult?: any;              // Resultado bruto da consulta
+  response: string;               // Resposta formatada
+  metadata: {
+    createdAt: Date;              // Data de criação
+    updatedAt: Date;              // Data da última atualização
+    version: string;              // Versão do modelo/sistema
+    executionTimeMs: number;      // Tempo de execução
+    sourceTables: string[];       // Tabelas utilizadas
+  };
+  feedback: {
+    positive: number;             // Contagem de feedback positivo
+    negative: number;             // Contagem de feedback negativo
+    comments: string[];           // Comentários de feedback
+    needsReview: boolean;         // Flag para revisão
+  };
+}
+```
+
+## Considerações de segurança
+- **Autenticação e autorização**:
+  - JWT para autenticação de todas as requisições
+  - Roles e permissões baseadas em níveis de acesso
+  - Refresh tokens com rotação segura
+
+- **Segurança de dados**:
+  - Validação rigorosa de todas as entradas do usuário
+  - Sanitização de inputs para prevenção de SQL injection
+  - Mascaramento de dados sensíveis (CPF, emails, etc.) em logs e respostas
+  - Criptografia de dados em trânsito e em repouso
+
+- **Limitações das consultas**:
+  - Proibição de operações de modificação (DELETE, UPDATE, INSERT)
+  - Timeout máximo configurável para execução de queries (default: 30s)
+  - Limite de consumo de recursos do BigQuery (max_bytes_billed)
+  - Validação sintática e semântica de todas as queries geradas
+  - Verificação de acesso a tabelas e campos permitidos
+
+- **Rate limiting e proteção contra abusos**:
+  - Limites de requisições por usuário/IP
+  - Detecção de padrões de abuso
+  - Proteção contra ataques de negação de serviço
+
+## Considerações de performance
+- **Estratégias de caching**:
+  - Cache semântico no Pinecone para queries similares
+  - Cache Redis para resultados de consultas frequentes
+  - Materialização de views para análises computacionalmente custosas
+  - Política de TTL para diferentes tipos de cache
+
+- **Otimização de consultas**:
+  - Análise e reformulação de queries para melhor performance
+  - Uso de particionamento e clustering no BigQuery
+  - Limites de volume de dados processados por consulta
+  - Monitoramento de consultas lentas
+
+- **Processamento assíncrono**:
+  - Sistema de filas para consultas longas (BullMQ)
+  - Feedback imediato para o usuário durante processamento
+  - Notificações em tempo real sobre o progresso
+
+- **Escalabilidade**:
+  - Arquitetura de microserviços para escala horizontal
+  - Auto-scaling baseado em métricas de carga
+  - Balanceamento de carga entre instâncias
+
+## Métricas e monitoramento
+- **Métricas operacionais**:
+  - Tempo médio de resposta (total e por componente)
+  - Taxa de hit/miss do cache semântico
+  - Taxa de sucesso na geração/validação de SQL
+  - Consumo de recursos (CPU, memória, rede)
+  - Custos de API externa (Vertex AI, OpenAI)
+
+- **Métricas de qualidade**:
+  - Taxa de feedback positivo/negativo
+  - Precisão das respostas (validada por feedback)
+  - Taxa de abandono durante interação
+  - Tempo médio de sessão do usuário
+
+- **Alertas**:
+  - Notificações para falhas recorrentes
+  - Alertas para aumento significativo nos custos
+  - Monitoramento de tempo de resposta acima do limiar
+  - Detecção de anomalias no padrão de uso
+
+## Estrutura de diretórios do projeto
+```
+src/
+├── main.ts                      # Ponto de entrada da aplicação
+├── app.module.ts                # Módulo principal
+├── config/                      # Configurações da aplicação
+│   ├── app.config.ts            # Configurações gerais
+│   ├── bigquery.config.ts       # Configurações do BigQuery
+│   ├── pinecone.config.ts       # Configurações do Pinecone
+│   └── ai.config.ts             # Configurações dos modelos de IA
+├── common/                      # Código compartilhado
+│   ├── decorators/              # Decoradores personalizados
+│   ├── filters/                 # Filtros de exceção
+│   ├── guards/                  # Guards de autenticação
+│   ├── interceptors/            # Interceptors
+│   ├── pipes/                   # Pipes de validação
+│   └── utils/                   # Utilidades gerais
+├── modules/                     # Módulos da aplicação
+│   ├── api-gateway/             # API Gateway
+│   │   ├── controllers/         # Controladores REST
+│   │   ├── dtos/                # Objetos de transferência de dados
+│   │   └── api-gateway.module.ts
+│   ├── orchestrator/            # Orchestrator Service
+│   │   ├── services/            # Serviços de orquestração
+│   │   ├── interfaces/          # Interfaces e tipos
+│   │   └── orchestrator.module.ts
+│   ├── semantic-cache/          # Semantic Cache Service
+│   │   ├── services/            # Serviços de cache
+│   │   ├── interfaces/          # Interfaces e tipos
+│   │   └── semantic-cache.module.ts
+│   ├── query-generator/         # Query Generator Service
+│   │   ├── services/            # Serviços de geração
+│   │   ├── templates/           # Templates de prompts
+│   │   ├── interfaces/          # Interfaces e tipos
+│   │   └── query-generator.module.ts
+│   ├── query-validator/         # Query Validator Service
+│   │   ├── services/            # Serviços de validação
+│   │   ├── validators/          # Regras de validação
+│   │   ├── interfaces/          # Interfaces e tipos
+│   │   └── query-validator.module.ts
+│   ├── bigquery-connector/      # BigQuery Connector Service
+│   │   ├── services/            # Serviços de conexão
+│   │   ├── interfaces/          # Interfaces e tipos
+│   │   └── bigquery-connector.module.ts
+│   ├── response-generator/      # Response Generator Service
+│   │   ├── services/            # Serviços de geração
+│   │   ├── templates/           # Templates de resposta
+│   │   ├── interfaces/          # Interfaces e tipos
+│   │   └── response-generator.module.ts
+│   └── feedback/                # Feedback Service
+│       ├── services/            # Serviços de feedback
+│       ├── interfaces/          # Interfaces e tipos
+│       └── feedback.module.ts
+├── database/                    # Configurações de banco de dados
+│   ├── bigquery/                # Integração com BigQuery
+│   └── pinecone/                # Integração com Pinecone
+└── integrations/                # Integrações externas
+    ├── vertex-ai/               # Integração com Vertex AI
+    └── openai/                  # Integração com OpenAI
+```
+
+## Padrões de código
+- **TypeScript**: Estrita tipagem com interfaces bem definidas
+  - Usar `strictNullChecks: true` e `noImplicitAny: true`
+  - Preferir interfaces para contratos e types para unions/intersections
+  - Documentar tipos complexos com JSDoc
+
+- **NestJS**: Seguir padrões recomendados do framework
+  - Usar injeção de dependência para todos os serviços
+  - Implementar módulos coesos e focados
+  - Usar pipes de validação para todas as entradas
+  - Implementar interceptors para logging e transformação de respostas
+
+- **Clean Code**: Princípios gerais
+  - Funções pequenas e com responsabilidade única
+  - Nomes descritivos para variáveis e funções
+  - Evitar comentários desnecessários, preferir código autoexplicativo
+  - Tratamento adequado de erros com classes de exceção específicas
+
+- **Testes**: Cobertura abrangente
+  - Testes unitários para serviços e componentes
+  - Testes de integração para fluxos completos
+  - Mocks para serviços externos (BigQuery, Pinecone, APIs de IA)
+  - Testes e2e para validação de cenários completos
+
+## Exemplos de perguntas e respostas esperadas
+
+### Exemplo 1: Produtos mais vendidos
+**Pergunta**: "Quais foram os 5 produtos mais vendidos no último mês?"
+
+**Processo**:
+1. Verificação no cache (assumindo miss)
+2. Geração de SQL:
+   ```sql
+   SELECT 
+     p.NameComplete as nome_produto,
+     SUM(i.quantidade) as total_vendido
+   FROM PEDIDOS as o
+   JOIN JSON_TABLE(o.itensJSON, '$[*]' COLUMNS(
+     codigo STRING PATH '$.codigo',
+     quantidade INT PATH '$.quantidade'
+   )) as i
+   JOIN PRODUTOS as p ON i.codigo = p.ProductRefId
+   WHERE o.data_pedido >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)
+   GROUP BY p.NameComplete
+   ORDER BY total_vendido DESC
+   LIMIT 5;
+   ```
+3. Execução no BigQuery
+4. Formatação da resposta:
+   ```
+   Os 5 produtos mais vendidos no último mês foram:
+   1. Nootrópico Brain Up - 60 tabletes (423 unidades)
+   2. Multivitamínico Daily - 30 cápsulas (389 unidades)
+   3. Proteína vegana - Chocolate - 900g (256 unidades)
+   4. Colágeno hidrolisado - 300g (201 unidades)
+   5. Omega 3 - 60 cápsulas (178 unidades)
+   ```
+
+### Exemplo 2: Análise de assinaturas
+**Pergunta**: "Qual a taxa de renovação das assinaturas mensais nos últimos 3 meses?"
+
+**Processo**:
+1. Verificação no cache (assumindo miss)
+2. Geração de SQL (simplificado):
+   ```sql
+   WITH assinaturas_ativas AS (
+     SELECT 
+       COUNT(DISTINCT customerId) as total_assinantes,
+       DATE_TRUNC(data_atualizacao_warehouse, MONTH) as mes
+     FROM STATUS_ASSINANTES
+     WHERE 
+       status = 'ACTIVE' 
+       AND data_atualizacao_warehouse >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
+     GROUP BY mes
+   ),
+   assinaturas_renovadas AS (
+     SELECT
+       COUNT(DISTINCT a.id) as renovacoes,
+       DATE_TRUNC(a.lastPurchaseDate, MONTH) as mes
+     FROM ASSINATURA a
+     WHERE 
+       a.cycleCount > 1
+       AND a.plan.frequency.periodicity = 'monthly'
+       AND a.lastPurchaseDate >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
+     GROUP BY mes
+   )
+   SELECT
+     ar.mes,
+     ar.renovacoes,
+     aa.total_assinantes,
+     ROUND(ar.renovacoes / aa.total_assinantes * 100, 2) as taxa_renovacao
+   FROM assinaturas_renovadas ar
+   JOIN assinaturas_ativas aa ON ar.mes = aa.mes
+   ORDER BY ar.mes;
+   ```
+3. Execução no BigQuery
+4. Formatação da resposta:
+   ```
+   A taxa média de renovação das assinaturas mensais nos últimos 3 meses foi de 87.3%.
+   
+   Detalhamento por mês:
+   - Dezembro/2024: 89.2% (842 renovações de 944 assinantes)
+   - Janeiro/2025: 86.7% (832 renovações de 960 assinantes)
+   - Fevereiro/2025: 85.9% (815 renovações de 949 assinantes)
+   
+   Observa-se uma tendência de leve queda na taxa de renovação nos últimos meses.
+   ```
+
+## Notas de implementação e melhores práticas
+
+### Prompts para geração de SQL
+Para garantir a geração de consultas SQL de alta qualidade:
+- Fornecer o schema completo das tabelas (com tipos e descrições)
+- Incluir exemplos de valores para campos relevantes
+- Explicitar as relações entre tabelas
+- Especificar limitações e restrições de segurança
+- Fornecer exemplos de consultas bem-sucedidas para casos similares
+
+### Otimização do BigQuery
+- Utilizar particionamento por data em tabelas como PEDIDOS
+- Implementar clustering por campos frequentemente filtrados
+- Criar views materializadas para consultas frequentes
+- Monitorar e otimizar slots de processamento
+
+### Estratégias para o Vector Store
+- Usar dimensão 1536 para embeddings (OpenAI ada-002)
+- Implementar namespace no Pinecone para separar diferentes tipos de templates
+- Adicionar metadados para facilitar filtragem
+- Implementar estratégia de TTL para dados temporais
+- Considerar recomputing periódico para templates antigos
+
+### Tratamento de erros e edge cases
+- Implementar fallbacks robustos para falhas em serviços externos
+- Ter respostas padrão para casos onde não é possível gerar SQL válido
+- Lidar graciosamente com perguntas fora do escopo dos dados disponíveis
+- Identificar e tratar ambiguidades nas perguntas dos usuários
+- Implementar sistema de escalação para humanos em casos complexos
+
+
+### Operation system
+- Use o windows 11
+- Use o cursor como editor de código
+- Use o git como sistema de versionamento
+- Use o github como plataforma de hospedagem do repositório
+
+
