@@ -1,3 +1,6 @@
+import { FeedbackType } from '../../api-gateway/dtos/feedback-request.dto';
+import { QueryMetadataDto } from '../../api-gateway/dtos/conversation.dto';
+
 export interface ConversationRequest {
   message: string;
   conversationId?: string;
@@ -62,14 +65,15 @@ export interface ConversationMessage {
 }
 
 export interface MessageMetadata {
-  source?: 'cache' | 'query';
-  processingTimeMs?: number;
-  confidence?: number;
-  [key: string]: any;
+  processingTimeMs: number;
+  source: 'cache' | 'query';
+  confidence: number;
+  tables?: string[];
+  sql?: string;
 }
 
 export interface MessageFeedback {
-  type: 'positive' | 'negative';
+  type: FeedbackType;
   comment?: string;
   timestamp: Date;
 }
@@ -77,7 +81,10 @@ export interface MessageFeedback {
 export interface ProcessingResult {
   message: string;
   metadata: MessageMetadata;
-  data?: any;
+  data?: {
+    type: 'table' | 'scalar' | 'chart';
+    content: any;
+  };
   suggestions?: string[];
 }
 

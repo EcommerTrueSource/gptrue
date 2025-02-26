@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SemanticCacheService } from '../../semantic-cache/services/semantic-cache.service';
+import { ISemanticCacheService, SEMANTIC_CACHE_SERVICE } from '../../semantic-cache/interfaces/semantic-cache.interface';
 import { FeedbackDto } from '../dtos/feedback.dto';
 import { FeedbackAnalytics } from '../interfaces/feedback.interface';
 
@@ -17,7 +17,8 @@ export class FeedbackService {
 
   constructor(
     private configService: ConfigService,
-    private semanticCacheService: SemanticCacheService,
+    @Inject(SEMANTIC_CACHE_SERVICE)
+    private semanticCacheService: ISemanticCacheService,
   ) {}
 
   /**

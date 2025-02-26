@@ -10,26 +10,94 @@ export class BigQueryService {
   private readonly logger = new Logger(BigQueryService.name);
   private readonly bigquery: BigQuery | null;
   private readonly enabled: boolean;
+  private readonly config: any;
 
   constructor(private readonly configService: ConfigService) {
-    this.enabled = this.configService.get<boolean>('bigquery.enabled') ?? false;
+    this.logger.debug('Iniciando BigQueryService...');
 
-    if (this.enabled) {
-      try {
-        this.bigquery = new BigQuery({
-          projectId: this.configService.get<string>('bigquery.projectId'),
-          keyFilename: this.configService.get<string>('bigquery.keyFilename'),
-        });
-        this.logger.log('BigQuery service inicializado com sucesso');
-      } catch (error: unknown) {
-        const err = error as Error;
-        this.logger.error(`Falha ao inicializar BigQuery: ${err.message}`, err.stack);
-        this.bigquery = null;
-        this.enabled = false;
-      }
-    } else {
+    this.enabled = this.configService.get<boolean>('bigquery.enabled');
+    this.logger.debug(`BigQuery enabled: ${this.enabled}`);
+
+    if (!this.enabled) {
       this.logger.warn('BigQuery está desabilitado pela configuração');
       this.bigquery = null;
+      return;
+    }
+
+    try {
+      const projectId = this.configService.get<string>('bigquery.projectId');
+      const credentials = this.configService.get('bigquery.credentials');
+
+      this.logger.debug('Configurações do BigQuery:', {
+        projectId,
+        clientEmail: credentials?.credentials?.client_email,
+        enabled: this.enabled
+      });
+
+      if (!projectId) {
+        throw new Error('projectId não configurado');
+      }
+
+      if (!credentials?.credentials?.client_email || !credentials?.credentials?.private_key) {
+        throw new Error('Credenciais do Google Cloud não configuradas');
+      }
+
+      this.config = { projectId, credentials };
+
+      this.logger.debug('Criando instância do BigQuery...');
+      this.bigquery = new BigQuery(this.config);
+
+      this.logger.debug('Iniciando teste de conexão...');
+      this.initialize().catch(error => {
+        this.logger.error('Falha ao inicializar BigQuery:', {
+          error: error.message,
+          stack: error.stack,
+          config: {
+            ...this.config,
+            credentials: '***REDACTED***'
+          }
+        });
+      });
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Falha ao configurar BigQuery: ${err.message}`, {
+        error: err.message,
+        stack: err.stack,
+        config: {
+          ...this.config,
+          credentials: '***REDACTED***'
+        }
+      });
+      this.bigquery = null;
+      this.enabled = false;
+    }
+  }
+
+  private async initialize() {
+    try {
+      const dataset = this.configService.get<string>('bigquery.dataset');
+      if (!dataset) {
+        throw new Error('Dataset não configurado');
+      }
+
+      this.logger.debug(`Testando conexão com dataset: ${dataset}`);
+      const [datasetInfo] = await this.bigquery.dataset(dataset).get();
+
+      this.logger.log('BigQuery inicializado com sucesso', {
+        dataset: datasetInfo.id,
+        location: datasetInfo.location
+      });
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('Erro ao inicializar BigQuery:', {
+        message: err.message,
+        stack: err.stack,
+        config: {
+          ...this.config,
+          dataset: this.configService.get<string>('bigquery.dataset')
+        }
+      });
+      throw error;
     }
   }
 
@@ -137,6 +205,22 @@ export class BigQueryService {
         `SELECT * FROM ${datasetId}.${tableId} LIMIT 0`,
         err
       );
+    }
+  }
+
+  async query<T = any>(query: string): Promise<T[]> {
+    try {
+      const options = {
+        query,
+        location: this.configService.get<string>('bigquery.location'),
+        maximumBytesBilled: String(this.configService.get<number>('bigquery.maxBytesProcessed')),
+      };
+
+      const [rows] = await this.bigquery.query(options);
+      return rows as T[];
+    } catch (error) {
+      this.logger.error('Erro ao executar query no BigQuery', { error, query });
+      throw error;
     }
   }
 }

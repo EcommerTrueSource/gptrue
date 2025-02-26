@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { OpenAIApiService } from './openai-api.service';
+import { OpenAIService } from './openai.service';
 
 @Module({
   imports: [ConfigModule],
-  providers: [OpenAIApiService],
-  exports: [OpenAIApiService],
+  providers: [OpenAIService],
+  exports: [OpenAIService],
 })
 export class OpenAIModule {}

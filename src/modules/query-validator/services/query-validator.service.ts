@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BigQuery, Job, Query } from '@google-cloud/bigquery';
+import { BigQuery } from '@google-cloud/bigquery';
 import { GeneratedQuery } from '../../query-generator/interfaces/query-generator.interface';
 import {
   ValidationResult,
@@ -13,7 +13,7 @@ import {
   DryRunResult,
 } from '../interfaces/query-validator.interface';
 import { DEFAULT_SECURITY_POLICY } from '../constants/security-policies';
-import { BigQueryService } from '../../../database/bigquery/bigquery.service';
+import { IBigQueryService, BIGQUERY_SERVICE } from '../../../database/bigquery/interfaces/bigquery.interface';
 
 @Injectable()
 export class QueryValidatorService {
@@ -47,7 +47,8 @@ export class QueryValidatorService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly bigQueryService: BigQueryService,
+    @Inject(BIGQUERY_SERVICE)
+    private readonly bigQueryService: IBigQueryService,
   ) {
     this.bigquery = new BigQuery({
       projectId: this.configService.get<string>('bigquery.projectId'),
@@ -85,14 +86,28 @@ export class QueryValidatorService {
         return securityResult;
       }
 
-      const dryRunResult = await this.bigQueryService.dryRun(query);
+      // Validar a query usando o BigQuery
+      const isValid = await this.bigQueryService.validateQuery(query);
+      if (!isValid) {
+        return {
+          isValid: false,
+          errors: [{
+            code: 'INVALID_QUERY',
+            message: 'A query é inválida segundo o BigQuery',
+            severity: 'error',
+          }],
+        };
+      }
+
+      // Estimar o custo
+      const estimatedCost = await this.bigQueryService.estimateCost(query);
 
       return {
         isValid: true,
         estimatedCost: {
-          processingBytes: dryRunResult.totalBytesProcessed,
+          processingBytes: estimatedCost,
           processingTime: new Date().toISOString(),
-          estimatedCost: this.calculateEstimatedCost(dryRunResult.totalBytesProcessed),
+          estimatedCost: this.calculateEstimatedCost(estimatedCost),
           affectedRows: 0,
         },
       };
@@ -115,7 +130,84 @@ export class QueryValidatorService {
     }
   }
 
-  private async validateSyntax(query: string): Promise<ValidationResult> {
+  private calculateEstimatedCost(bytesProcessed: number): number {
+    // Custo por TB = $5
+    const terabytes = bytesProcessed / (1024 * 1024 * 1024 * 1024);
+    return terabytes * 5;
+  }
+
+  private extractTableNames(query: string): string[] {
+    const fromRegex = /FROM\s+([^\s,;()]+)/gi;
+    const joinRegex = /JOIN\s+([^\s,;()]+)/gi;
+    const tables = new Set<string>();
+
+    let match;
+    while ((match = fromRegex.exec(query)) !== null) {
+      tables.add(match[1].toUpperCase());
+    }
+    while ((match = joinRegex.exec(query)) !== null) {
+      tables.add(match[1].toUpperCase());
+    }
+
+    return Array.from(tables);
+  }
+
+  private containsRestrictedColumns(query: string, table: string, columns: string[]): boolean {
+    const normalizedQuery = query.toUpperCase();
+    const normalizedTable = table.toUpperCase();
+    return columns.some(column => {
+      const normalizedColumn = column.toUpperCase();
+      return normalizedQuery.includes(`${normalizedTable}.${normalizedColumn}`) ||
+             normalizedQuery.includes(`${normalizedColumn}`);
+    });
+  }
+
+  private containsMaliciousComments(query: string): boolean {
+    const commentRegex = /--.*$|\/\*[\s\S]*?\*\//gm;
+    const comments = query.match(commentRegex) || [];
+
+    const suspiciousPatterns = [
+      /union/i,
+      /select.*from/i,
+      /insert/i,
+      /update/i,
+      /delete/i,
+      /drop/i,
+      /exec/i,
+      /execute/i,
+    ];
+
+    return comments.some(comment =>
+      suspiciousPatterns.some(pattern => pattern.test(comment))
+    );
+  }
+
+  /**
+   * Remove comentários e espaços em branco extras da consulta
+   * @param query Consulta SQL
+   * @returns Consulta limpa
+   */
+  private sanitizeQuery(query: string): string {
+    return query
+      .replace(/--.*$/gm, '') // Remove comentários de linha única
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove comentários multilinhas
+      .replace(/\s+/g, ' ') // Normaliza espaços
+      .trim();
+  }
+
+  /**
+   * Verifica se a consulta contém comandos não permitidos
+   * @param query Consulta SQL
+   * @returns true se contiver comandos não permitidos
+   */
+  private containsDisallowedCommands(query: string): boolean {
+    const normalizedQuery = query.toUpperCase();
+    return this.DISALLOWED_COMMANDS.some(command =>
+      normalizedQuery.includes(command)
+    );
+  }
+
+  private validateSyntax(query: string): ValidationResult {
     try {
       if (!query || query.trim().length === 0) {
         return {
@@ -223,125 +315,6 @@ export class QueryValidatorService {
         }],
       };
     }
-  }
-
-  private async executeQuery(query: string): Promise<QueryResult> {
-    try {
-      const result = await this.bigQueryService.dryRun(query);
-
-      if (!result || !result.schema) {
-        throw new Error('Resultado da dry run inválido');
-      }
-
-      return {
-        data: [],
-        metadata: {
-          schema: result.schema.fields.map(field => ({
-            name: field.name,
-            type: field.type,
-            mode: field.mode as 'NULLABLE' | 'REQUIRED' | 'REPEATED',
-            description: field.description,
-          })),
-          totalRows: 0,
-          processingTime: new Date().toISOString(),
-          bytesProcessed: result.totalBytesProcessed,
-          cacheHit: false,
-        },
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao executar dry run';
-      this.logger.error({
-        message: 'Erro ao executar dry run da query',
-        error: errorMessage,
-        query,
-      });
-      throw error;
-    }
-  }
-
-  private calculateEstimatedCost(bytesProcessed: number): number {
-    // Custo por TB = $5 (valor exemplo)
-    const costPerTB = 5;
-    const bytesPerTB = 1099511627776; // 1 TB em bytes
-    return (bytesProcessed / bytesPerTB) * costPerTB;
-  }
-
-  private extractTableNames(query: string): string[] {
-    const fromRegex = /FROM\s+([^\s,;()]+)/gi;
-    const joinRegex = /JOIN\s+([^\s,;()]+)/gi;
-
-    const tables = new Set<string>();
-
-    let match;
-    while ((match = fromRegex.exec(query)) !== null) {
-      tables.add(match[1].toUpperCase());
-    }
-    while ((match = joinRegex.exec(query)) !== null) {
-      tables.add(match[1].toUpperCase());
-    }
-
-    return Array.from(tables);
-  }
-
-  private containsRestrictedColumns(query: string, table: string, columns: string[]): boolean {
-    const normalizedQuery = query.toUpperCase();
-    const normalizedTable = table.toUpperCase();
-
-    return columns.some(column => {
-      const normalizedColumn = column.toUpperCase();
-      const patterns = [
-        `${normalizedTable}.${normalizedColumn}`,
-        `${normalizedColumn}`,
-      ];
-      return patterns.some(pattern => normalizedQuery.includes(pattern));
-    });
-  }
-
-  private containsMaliciousComments(query: string): boolean {
-    const maliciousPatterns = [
-      '--',
-      '/*',
-      '*/',
-      '#',
-      ';--',
-      '1=1',
-      'OR 1=1',
-      'DROP',
-      'DELETE',
-      'UPDATE',
-      'INSERT',
-    ];
-
-    const normalizedQuery = query.toUpperCase();
-    return maliciousPatterns.some(pattern =>
-      normalizedQuery.includes(pattern.toUpperCase())
-    );
-  }
-
-  /**
-   * Remove comentários e espaços em branco extras da consulta
-   * @param query Consulta SQL
-   * @returns Consulta limpa
-   */
-  private sanitizeQuery(query: string): string {
-    return query
-      .replace(/--.*$/gm, '') // Remove comentários de linha única
-      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove comentários multilinhas
-      .trim() // Remove espaços em branco no início e fim
-      .replace(/\s+/g, ' '); // Substitui múltiplos espaços por um único espaço
-  }
-
-  /**
-   * Verifica se a consulta contém comandos não permitidos
-   * @param query Consulta SQL
-   * @returns true se contiver comandos não permitidos
-   */
-  private containsDisallowedCommands(query: string): boolean {
-    const upperQuery = query.toUpperCase();
-    return this.DISALLOWED_COMMANDS.some(command => {
-      const regex = new RegExp(`\\b${command}\\b`);
-      return regex.test(upperQuery);
-    });
   }
 
   /**

@@ -8,8 +8,11 @@ export type ResponseSource = 'query' | 'cache';
  */
 export interface ResponseContext {
   question: string;
-  queryResult: QueryResult;
-  config?: Partial<ResponseGeneratorConfig>;
+  queryResult?: any;
+  metadata?: {
+    startTime: number;
+    [key: string]: any;
+  };
 }
 
 /**
@@ -54,11 +57,9 @@ export interface ResponseGeneratorConfig {
  */
 export interface GeneratedResponse {
   message: string;
-  data?: ResponseData;
-  suggestions: string[];
   metadata: {
     processingTimeMs: number;
-    source: ResponseSource;
+    source: string;
     confidence: number;
     tables: string[];
     sql?: string;

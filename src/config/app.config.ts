@@ -1,10 +1,19 @@
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('app', () => ({
+  port: parseInt(process.env.PORT ?? '3000', 10),
+  logLevel: process.env.LOG_LEVEL ?? 'debug',
+  frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+  enableMetrics: process.env.ENABLE_METRICS === 'true',
+  metricsPort: parseInt(process.env.METRICS_PORT ?? '9090', 10),
+  requestTimeout: parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
+  maxConcurrentQueries: parseInt(process.env.MAX_CONCURRENT_QUERIES ?? '10', 10),
+  enableRateLimiting: process.env.ENABLE_RATE_LIMITING === 'true',
+  enableRequestValidation: process.env.ENABLE_REQUEST_VALIDATION === 'true',
+  enableSqlValidation: process.env.ENABLE_SQL_VALIDATION === 'true',
   environment: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT ?? '3000', 10) || 3000,
   apiPrefix: process.env.API_PREFIX || 'api',
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   logging: {
     level: process.env.LOG_LEVEL || 'info',
   },

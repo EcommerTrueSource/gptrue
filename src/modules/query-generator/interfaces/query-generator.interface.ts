@@ -1,3 +1,5 @@
+import { HealthStatus } from '../../semantic-cache/interfaces/semantic-cache.interface';
+
 export interface TableSchema {
   name: string;
   description: string;
@@ -38,13 +40,18 @@ export interface QueryContext {
   preferredVisualization?: string;
 }
 
+export const QUERY_GENERATOR_SERVICE = 'QUERY_GENERATOR_SERVICE';
+
 export interface GeneratedQuery {
   sql: string;
+  confidence: number;
   tables: string[];
   parameters?: Record<string, any>;
-  estimatedCost?: {
-    processingBytes: number;
-    processingTime: string;
-  };
-  warnings?: string[];
+}
+
+export interface IQueryGeneratorService {
+  generateSQL(question: string, context?: Record<string, any>): Promise<string>;
+  validateQuery(sql: string): Promise<boolean>;
+  explainQuery(sql: string): Promise<string>;
+  getQueryComplexity(sql: string): Promise<number>;
 }

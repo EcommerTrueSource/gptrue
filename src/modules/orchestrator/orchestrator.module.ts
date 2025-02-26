@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { OrchestratorService } from './services/orchestrator.service';
 import { BigQueryModule } from '../../database/bigquery/bigquery.module';
 import { QueryGeneratorModule } from '../query-generator/query-generator.module';
@@ -9,6 +10,7 @@ import { OrchestratorController } from './controllers/orchestrator.controller';
 
 @Module({
   imports: [
+    ConfigModule,
     BigQueryModule,
     QueryGeneratorModule,
     ResponseGeneratorModule,

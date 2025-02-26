@@ -41,10 +41,20 @@ async function bootstrap(): Promise<void> {
   // Configuração de logging
   const winstonLogger = winston.createLogger({
     level: configService.get<string>('app.logging.level') ?? 'info',
-    format: winston.format.json(),
+    levels: winston.config.npm.levels,
+    format: winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.json()
+    ),
     transports: [
       new winston.transports.Console({
-        format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+        format: winston.format.combine(
+          winston.format.colorize(),
+          winston.format.timestamp(),
+          winston.format.printf(({ timestamp, level, message, ...meta }) => {
+            return `[${timestamp}] ${level}: ${message} ${Object.keys(meta).length ? JSON.stringify(meta) : ''}`;
+          })
+        ),
       }),
     ],
   });

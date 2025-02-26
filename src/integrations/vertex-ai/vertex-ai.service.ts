@@ -1,81 +1,47 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { VertexAI, GenerativeModelPreview, GenerateContentResult, Content } from '@google-cloud/vertexai';
+import { VertexAI } from '@google-cloud/vertexai';
 
 @Injectable()
 export class VertexAIService {
   private readonly logger = new Logger(VertexAIService.name);
-  private readonly vertexAi: VertexAI;
+  private readonly vertexai: VertexAI;
   private readonly model: string;
   private readonly location: string;
-  private generativeModel: GenerativeModelPreview;
 
-  constructor(private readonly configService: ConfigService) {
-    try {
-      const projectId = this.configService.get<string>('VERTEX_AI_PROJECT_ID');
-      this.location = this.configService.get<string>('VERTEX_AI_LOCATION') || 'us-central1';
-      this.model = this.configService.get<string>('VERTEX_AI_MODEL') || 'text-bison';
+  constructor(private configService: ConfigService) {
+    const projectId = this.configService.get<string>('vertexai.projectId');
 
-      if (!projectId) {
-        throw new Error('VERTEX_AI_PROJECT_ID não configurado');
-      }
-
-      this.vertexAi = new VertexAI({
-        project: projectId,
-        location: this.location,
-      });
-
-      this.generativeModel = this.vertexAi.preview.getGenerativeModel({
-        model: this.model,
-        generationConfig: {
-          maxOutputTokens: this.configService.get<number>('VERTEX_AI_MAX_TOKENS') || 1024,
-          temperature: this.configService.get<number>('VERTEX_AI_TEMPERATURE') || 0.2,
-        },
-      });
-
-      this.logger.log('VertexAI Service inicializado com sucesso');
-    } catch (error: unknown) {
-      const err = error as Error;
-      this.logger.error(`Erro ao inicializar VertexAI: ${err.message}`, err.stack);
-      throw new Error(`Falha ao inicializar VertexAI: ${err.message}`);
+    if (!projectId) {
+      throw new Error('VertexAI projectId não configurado');
     }
+
+    this.location = this.configService.get<string>('vertexai.location') || 'us-central1';
+    this.model = this.configService.get<string>('vertexai.model') || 'text-bison@001';
+
+    this.vertexai = new VertexAI({
+      project: projectId,
+      location: this.location,
+    });
+
+    this.logger.log('VertexAI Service inicializado com sucesso');
   }
 
   async generateSQL(prompt: string): Promise<string> {
     try {
-      this.logger.debug('Gerando SQL com VertexAI...');
+      const generativeModel = this.vertexai.preview.getGenerativeModel({
+        model: this.model,
+        generationConfig: {
+          maxOutputTokens: 1024,
+          temperature: 0.2,
+        },
+      });
 
-      const request = {
-        contents: [{
-          role: 'user',
-          parts: [{ text: prompt }]
-        }] as Content[],
-      };
-
-      const result = await this.generativeModel.generateContent(request);
-      const response = result.response;
-
-      if (!response?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        throw new Error('Resposta inválida do VertexAI');
-      }
-
-      const generatedSql = this.extractSqlFromResponse(response.candidates[0].content.parts[0].text);
-
-      this.logger.debug('SQL gerado com sucesso');
-      return generatedSql;
-    } catch (error: unknown) {
-      const err = error as Error;
-      this.logger.error('Erro ao gerar SQL com VertexAI:', err.message);
-      throw new Error(`Falha na geração de SQL: ${err.message}`);
+      const result = await generativeModel.generateContent(prompt);
+      return result.response.candidates[0].content.parts[0].text;
+    } catch (error) {
+      this.logger.error('Erro ao gerar SQL com VertexAI', error);
+      throw error;
     }
-  }
-
-  private extractSqlFromResponse(response: string): string {
-    // Remove comentários e espaços em branco extras
-    return response
-      .trim()
-      .replace(/^```sql\n?/, '')
-      .replace(/\n?```$/, '')
-      .trim();
   }
 }
