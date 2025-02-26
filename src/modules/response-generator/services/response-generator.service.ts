@@ -23,28 +23,25 @@ export class ResponseGeneratorService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly openAIService: OpenAIApiService
+    private readonly openAIService: OpenAIApiService,
   ) {}
 
   async generateResponse(context: ResponseContext): Promise<GeneratedResponse> {
     try {
       this.logger.log(`Gerando resposta para: ${context.question}`);
-      
+
       const config = { ...this.defaultConfig, ...context.config };
       const startTime = Date.now();
 
       // Preparar o prompt para o OpenAI
       const messages = this.buildPrompt(context);
-      
+
       // Gerar resposta usando OpenAI
-      const response = await this.openAIService.generateText(
-        messages as OpenAIMessage[],
-        {
-          temperature: this.configService.get<number>('ai.openai.temperature') || 0.7,
-          maxTokens: this.configService.get<number>('ai.openai.maxTokens') || 2000,
-          model: this.configService.get<string>('ai.openai.model') || 'gpt-4',
-        }
-      );
+      const response = await this.openAIService.generateText(messages as OpenAIMessage[], {
+        temperature: this.configService.get<number>('ai.openai.temperature') || 0.7,
+        maxTokens: this.configService.get<number>('ai.openai.maxTokens') || 2000,
+        model: this.configService.get<string>('ai.openai.model') || 'gpt-4',
+      });
 
       this.logger.debug('Resposta gerada com sucesso');
 
@@ -72,17 +69,17 @@ export class ResponseGeneratorService {
 
       return responseObj;
     } catch (error) {
-      this.logger.error(`Erro ao gerar resposta: ${error.message}`, error.stack);
-      
+      this.logger.error(`Erro ao gerar resposta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, error instanceof Error ? error.stack : undefined);
+
       // Tentar fallback com modelo menor
       try {
         this.logger.log('Tentando fallback com modelo menor');
         const startTime = Date.now();
-        
+
         const messages = this.buildPrompt(context);
-        
+
         const response = await this.openAIService.generateTextFallback(messages as OpenAIMessage[]);
-        
+
         this.logger.debug('Resposta gerada com sucesso no fallback');
 
         // Gerar visualização se necessário
@@ -109,18 +106,18 @@ export class ResponseGeneratorService {
 
         return responseObj;
       } catch (fallbackError) {
-        this.logger.error(`Erro no fallback: ${fallbackError.message}`, fallbackError.stack);
-        throw new Error(`Falha ao gerar resposta: ${error.message}`);
+        this.logger.error(`Erro no fallback: ${fallbackError instanceof Error ? fallbackError.message : 'Erro desconhecido'}`, fallbackError instanceof Error ? fallbackError.stack : undefined);
+        throw new Error(`Falha ao gerar resposta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       }
     }
   }
 
   private buildPrompt(context: ResponseContext): Array<{ role: string; content: string }> {
     const { question, queryResult } = context;
-    
+
     // Formatar o resultado da consulta
     let formattedResult = '';
-    
+
     if (queryResult) {
       if (queryResult.metadata?.schema && queryResult.metadata?.totalRows) {
         formattedResult = `Resultado da consulta (${queryResult.metadata.totalRows} linhas):\n`;
@@ -168,7 +165,10 @@ export class ResponseGeneratorService {
     return 'table';
   }
 
-  private async addVisualization(data: ResponseData, context: ResponseContext): Promise<ResponseData> {
+  private async addVisualization(
+    data: ResponseData,
+    context: ResponseContext,
+  ): Promise<ResponseData> {
     // Implementar lógica de visualização baseada no tipo de dados
     if (data.type === 'table') {
       data.visualization = {
@@ -200,10 +200,11 @@ export class ResponseGeneratorService {
     // Verificar se os dados contêm séries temporais
     if (!data || data.length === 0) return false;
     const firstRow = data[0];
-    return Object.keys(firstRow).some(key => 
-      key.toLowerCase().includes('data') ||
-      key.toLowerCase().includes('date') ||
-      key.toLowerCase().includes('time')
+    return Object.keys(firstRow).some(
+      key =>
+        key.toLowerCase().includes('data') ||
+        key.toLowerCase().includes('date') ||
+        key.toLowerCase().includes('time'),
     );
   }
 
@@ -217,15 +218,12 @@ export class ResponseGeneratorService {
       }
 
       const messages = this.buildSuggestionsPrompt(context);
-      
-      const response = await this.openAIService.generateText(
-        messages as OpenAIMessage[],
-        {
-          temperature: 0.7,
-          maxTokens: 200,
-          model: this.configService.get<string>('ai.openai.model') || 'gpt-4',
-        }
-      );
+
+      const response = await this.openAIService.generateText(messages as OpenAIMessage[], {
+        temperature: 0.7,
+        maxTokens: 200,
+        model: this.configService.get<string>('ai.openai.model') || 'gpt-4',
+      });
 
       // Espera-se que a resposta seja uma lista de sugestões separadas por quebras de linha
       const suggestions = response
@@ -236,31 +234,33 @@ export class ResponseGeneratorService {
 
       return suggestions;
     } catch (error) {
-      this.logger.error(`Erro ao gerar sugestões: ${error.message}`, error.stack);
+      this.logger.error(`Erro ao gerar sugestões: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, error instanceof Error ? error.stack : undefined);
       return [];
     }
   }
 
-  private buildSuggestionsPrompt(context: ResponseContext): Array<{ role: string; content: string }> {
+  private buildSuggestionsPrompt(
+    context: ResponseContext,
+  ): Array<{ role: string; content: string }> {
     const { question, queryResult } = context;
-    
+
     return [
       {
         role: 'system',
-        content: `Você é um assistente especializado em análise de dados de e-commerce. 
-        Com base na pergunta do usuário e nos resultados da consulta, sugira 3 perguntas relacionadas 
-        que o usuário poderia fazer para aprofundar sua análise. As perguntas devem ser relevantes, 
+        content: `Você é um assistente especializado em análise de dados de e-commerce.
+        Com base na pergunta do usuário e nos resultados da consulta, sugira 3 perguntas relacionadas
+        que o usuário poderia fazer para aprofundar sua análise. As perguntas devem ser relevantes,
         específicas e baseadas nos dados disponíveis. Formate as sugestões como uma lista numerada.`,
       },
       {
         role: 'user',
         content: `Pergunta original: "${question}"
-        
+
         Resultado da consulta:
         ${JSON.stringify(queryResult, null, 2)}
-        
+
         Gere 3 sugestões de perguntas relacionadas que eu poderia fazer para aprofundar minha análise.`,
       },
     ];
   }
-} 
+}

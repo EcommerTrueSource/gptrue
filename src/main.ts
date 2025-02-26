@@ -7,8 +7,9 @@ import helmet from 'helmet';
 import * as compression from 'compression';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { Logger } from '@nestjs/common';
+import { setupSwagger } from './config/swagger.config';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
@@ -26,8 +27,8 @@ async function bootstrap() {
   // Segurança
   app.use(helmet());
   app.enableCors({
-    origin: configService.get('CORS_ORIGIN'),
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    origin: process.env.FRONTEND_URL || '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 
@@ -38,24 +39,39 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   // Configuração de logging
-  const loggerWinston = winston.createLogger({
-    level: configService.get('app.logging.level'),
+  const winstonLogger = winston.createLogger({
+    level: configService.get<string>('app.logging.level') ?? 'info',
     format: winston.format.json(),
     transports: [
       new winston.transports.Console({
-        format: winston.format.combine(
-          winston.format.colorize(),
-          winston.format.simple()
-        ),
+        format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
       }),
     ],
   });
 
+  // Configuração do logger global
+  app.useLogger(winstonLogger);
+
+  // Configuração do Swagger
+  setupSwagger(app);
+
   // Inicialização do servidor
-  const port = configService.get('app.port');
+  const port = configService.get<number>('app.port') ?? 3000;
   await app.listen(port);
   logger.log(`Aplicação iniciada na porta ${port}`);
-  logger.log(`Ambiente: ${configService.get('app.environment')}`);
+  logger.log(`Ambiente: ${configService.get<string>('app.environment') ?? 'development'}`);
   logger.log(`Documentação da API disponível em: http://localhost:${port}/api/docs`);
 }
-bootstrap();
+
+// Tratamento de erros não capturados
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+process.on('uncaughtException', error => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+void bootstrap();

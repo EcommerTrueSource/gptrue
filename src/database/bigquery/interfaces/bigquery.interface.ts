@@ -11,4 +11,4 @@ export interface QueryMetadata {
 export interface QueryResult {
   rows: any[];
   metadata: QueryMetadata;
-} 
+}

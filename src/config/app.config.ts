@@ -1,37 +1,18 @@
 import { registerAs } from '@nestjs/config';
-import * as Joi from 'joi';
 
-export interface AppConfig {
-  port: number;
-  environment: string;
-  jwt: {
-    secret: string;
-    expiresIn: string;
-  };
-  rateLimiting: {
-    points: number;
-    duration: number;
-  };
-}
-
-export const appConfigValidationSchema = Joi.object({
-  PORT: Joi.number().default(3000),
-  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
-  JWT_SECRET: Joi.string().required(),
-  JWT_EXPIRES_IN: Joi.string().default('1d'),
-  RATE_LIMIT_POINTS: Joi.number().default(100),
-  RATE_LIMIT_DURATION: Joi.number().default(60),
-});
-
-export default registerAs('app', (): AppConfig => ({
-  port: parseInt(process.env.PORT, 10) || 3000,
+export default registerAs('app', () => ({
   environment: process.env.NODE_ENV || 'development',
-  jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+  port: parseInt(process.env.PORT ?? '3000', 10) || 3000,
+  apiPrefix: process.env.API_PREFIX || 'api',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  logging: {
+    level: process.env.LOG_LEVEL || 'info',
   },
-  rateLimiting: {
-    points: parseInt(process.env.RATE_LIMIT_POINTS, 10) || 100,
-    duration: parseInt(process.env.RATE_LIMIT_DURATION, 10) || 60,
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT ?? '6379', 10) || 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+    ttl: parseInt(process.env.REDIS_TTL ?? '3600', 10) || 3600,
+    max: parseInt(process.env.REDIS_MAX_ITEMS ?? '100', 10) || 100,
   },
-})); 
+}));

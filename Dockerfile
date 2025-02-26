@@ -1,7 +1,7 @@
-# Build stage
+# Estágio de build
 FROM node:18-alpine AS builder
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
 # Copiar arquivos de dependência
 COPY package*.json ./
@@ -16,18 +16,18 @@ COPY . .
 # Build da aplicação
 RUN npm run build
 
-# Production stage
+# Estágio de produção
 FROM node:18-alpine
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
 # Copiar arquivos necessários do estágio de build
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
+COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/package*.json ./
 
 # Expor porta da aplicação
 EXPOSE 3000
 
 # Comando para iniciar a aplicação
-CMD ["npm", "run", "start:prod"] 
+CMD ["npm", "run", "start:prod"]

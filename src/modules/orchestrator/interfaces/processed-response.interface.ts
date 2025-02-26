@@ -12,4 +12,4 @@ export interface ProcessedResponse {
   result: QueryResult;
   response: string;
   metadata: ProcessedResponseMetadata;
-} 
+}

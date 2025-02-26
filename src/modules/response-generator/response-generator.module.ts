@@ -8,4 +8,4 @@ import { ResponseGeneratorService } from './services/response-generator.service'
   providers: [ResponseGeneratorService],
   exports: [ResponseGeneratorService],
 })
-export class ResponseGeneratorModule {} 
+export class ResponseGeneratorModule {}

@@ -1,7 +1,17 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Job } from 'bull';
 import { BigQueryService } from '../../../database/bigquery/bigquery.service';
+
+interface QueryJobData {
+  query: string;
+  options?: {
+    timeoutMs?: number;
+    maxBytes?: number;
+    useLegacySql?: boolean;
+    location?: string;
+  };
+}
 
 @Processor('query-processing')
 export class QueryProcessor {
@@ -15,34 +25,36 @@ export class QueryProcessor {
    * @returns Resultado da consulta
    */
   @Process('process-query')
-  async processQuery(job: Job<{ query: string; options?: any }>) {
+  async processQuery(job: Job<QueryJobData>) {
     try {
       this.logger.log(`Processando consulta: ${job.id}`);
-      job.updateProgress(10);
+      await job.progress(10);
 
       const { query, options } = job.data;
-      
+
       // Validar a consulta
       this.logger.debug(`Validando consulta: ${query}`);
-      job.updateProgress(20);
+      await job.progress(20);
 
       // Executar a consulta
       this.logger.debug('Executando consulta no BigQuery');
-      job.updateProgress(50);
-      const result = await this.bigQueryService.executeQuery(query, options);
-      job.updateProgress(90);
+      await job.progress(50);
+
+      const result = await this.bigQueryService.executeQuery(query);
+      await job.progress(90);
 
       this.logger.log(`Consulta processada com sucesso: ${job.id}`);
-      job.updateProgress(100);
-      
+      await job.progress(100);
+
       return {
         success: true,
         result,
         executionTimeMs: Date.now() - job.timestamp,
       };
-    } catch (error) {
-      this.logger.error(`Erro ao processar consulta: ${error.message}`, error.stack);
-      throw new Error(`Erro ao processar consulta: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao processar consulta: ${err.message}`, err.stack);
+      throw new Error(`Erro ao processar consulta: ${err.message}`);
     }
   }
-} 
+}

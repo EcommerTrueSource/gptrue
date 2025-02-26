@@ -11,49 +11,61 @@ export class ApiGatewayService {
   async handleConversation(
     conversationRequest: ConversationRequestDto,
   ): Promise<ConversationResponseDto> {
-    try {
-      // TODO: Implementar integração com o Orchestrator Service
-      return {
-        id: 'temp-id',
-        conversationId: conversationRequest.conversationId || 'new-conversation',
-        message: 'Resposta temporária - integração pendente',
-        metadata: {
-          processingTimeMs: 0,
-          source: 'cache',
-          confidence: 1,
-        },
-        feedbackOptions: {
-          thumbsUp: true,
-          thumbsDown: true,
-          commentEnabled: true,
-        },
-      };
-    } catch (error) {
-      throw error;
-    }
+    // Simula processamento assíncrono
+    await Promise.resolve();
+
+    const response = new ConversationResponseDto();
+    response.id = '123';
+
+    response.conversationId =
+      conversationRequest.conversationId || 'new-conversation';
+
+    response.message = 'Resposta temporária';
+    response.metadata = {
+      processingTimeMs: 0,
+      source: 'cache',
+      confidence: 1,
+    };
+    response.feedbackOptions = {
+      thumbsUp: true,
+      thumbsDown: true,
+      commentEnabled: true,
+    };
+    return response;
   }
 
-  async getConversationHistory(conversationId: string) {
-    try {
-      // TODO: Implementar busca de histórico
-      return {
-        conversationId,
-        history: [],
-      };
-    } catch (error) {
-      throw error;
-    }
+  private async getHistory(
+    conversationId: string,
+  ): Promise<ConversationResponseDto[]> {
+    // Simula busca assíncrona
+    await Promise.resolve();
+
+    const response = new ConversationResponseDto();
+    response.id = conversationId;
+    response.conversationId = conversationId;
+    response.message = 'Histórico temporário';
+    response.metadata = {
+      processingTimeMs: 0,
+      source: 'cache',
+      confidence: 1,
+    };
+    response.feedbackOptions = {
+      thumbsUp: true,
+      thumbsDown: true,
+      commentEnabled: true,
+    };
+    return [response];
   }
 
-  async handleFeedback(feedbackRequest: FeedbackRequestDto) {
-    try {
-      // TODO: Implementar processamento de feedback
-      return {
-        success: true,
-        message: 'Feedback recebido com sucesso',
-      };
-    } catch (error) {
-      throw error;
-    }
+  async getConversationHistory(
+    conversationId: string,
+  ): Promise<ConversationResponseDto[]> {
+    return await this.getHistory(conversationId);
   }
-} 
+
+  async handleFeedback(feedbackRequest: FeedbackRequestDto): Promise<void> {
+    // Simula processamento assíncrono do feedback
+    await Promise.resolve();
+    console.log('Feedback recebido:', feedbackRequest);
+  }
+}

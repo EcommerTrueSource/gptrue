@@ -65,4 +65,4 @@ export interface AggregatedMetrics {
   totalApiCosts: number;
   errorCount: number;
   recentErrorCount: number;
-} 
+}

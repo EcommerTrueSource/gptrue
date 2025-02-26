@@ -1,5 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Request } from 'express';
+import { ClerkUser } from 'src/modules/api-gateway/clerk/interfaces/clerk-types.interface';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -11,11 +13,11 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest();
+    const { user } = context.switchToHttp().getRequest<Request & { user: ClerkUser }>();
     if (!user || !user.roles) {
       return false;
     }
 
-    return requiredRoles.some((role) => user.roles.includes(role));
+    return requiredRoles.some(role => user.roles.includes(role));
   }
-} 
+}

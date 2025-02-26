@@ -1,12 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PineconeClient } from '@pinecone-database/pinecone';
+import { Pinecone, PineconeRecord, RecordMetadata } from '@pinecone-database/pinecone';
 import { CacheTemplate } from './interfaces/pinecone.interface';
 
 @Injectable()
 export class PineconeService implements OnModuleInit {
   private readonly logger = new Logger(PineconeService.name);
-  private pinecone: PineconeClient;
+  private pinecone: Pinecone;
   private indexName: string;
   private namespace: string;
   private dimension: number;
@@ -14,7 +14,6 @@ export class PineconeService implements OnModuleInit {
   private ttlDays: number;
 
   constructor(private configService: ConfigService) {
-    this.pinecone = new PineconeClient();
     this.indexName = this.configService.get<string>('pinecone.indexName') || 'gptrue-index';
     this.namespace = this.configService.get<string>('pinecone.namespace') || 'default';
     this.dimension = this.configService.get<number>('pinecone.dimension') || 1536;
@@ -31,14 +30,14 @@ export class PineconeService implements OnModuleInit {
    */
   private async initializePinecone() {
     try {
-      await this.pinecone.init({
-        environment: this.configService.get<string>('pinecone.environment') || 'us-west1-gcp',
+      this.pinecone = new Pinecone({
         apiKey: this.configService.get<string>('pinecone.apiKey') || '',
       });
       this.logger.log('Pinecone inicializado com sucesso');
-    } catch (error) {
-      this.logger.error(`Erro ao inicializar Pinecone: ${error.message}`, error.stack);
-      throw new Error(`Erro ao inicializar Pinecone: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao inicializar Pinecone: ${err.message}`, err.stack);
+      throw new Error(`Erro ao inicializar Pinecone: ${err.message}`);
     }
   }
 
@@ -50,7 +49,6 @@ export class PineconeService implements OnModuleInit {
   async upsertTemplate(template: CacheTemplate): Promise<string> {
     try {
       const index = this.pinecone.Index(this.indexName);
-      
       const metadata = {
         question: template.question,
         query: template.query || '',
@@ -65,30 +63,24 @@ export class PineconeService implements OnModuleInit {
         needsReview: template.feedback.needsReview,
       };
 
-      // Adicionar TTL se habilitado
-      const ttl = this.ttlEnabled 
-        ? new Date(Date.now() + this.ttlDays * 24 * 60 * 60 * 1000) 
-        : undefined;
+      const record: PineconeRecord<RecordMetadata> = {
+        id: template.id,
+        values: template.questionEmbedding,
+        metadata,
+      };
 
-      await index.upsert({
-        upsertRequest: {
-          vectors: [
-            {
-              id: template.id,
-              values: template.questionEmbedding,
-              metadata,
-              ...(ttl && { ttl }),
-            },
-          ],
-          namespace: this.namespace,
-        },
-      });
+      if (this.ttlEnabled) {
+        record.metadata.ttl = new Date(Date.now() + this.ttlDays * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      await index.upsert([record]);
 
       this.logger.log(`Template inserido com sucesso: ${template.id}`);
       return template.id;
-    } catch (error) {
-      this.logger.error(`Erro ao inserir template no Pinecone: ${error.message}`, error.stack);
-      throw new Error(`Erro ao inserir template no Pinecone: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao inserir template no Pinecone: ${err.message}`, err.stack);
+      throw new Error(`Erro ao inserir template no Pinecone: ${err.message}`);
     }
   }
 
@@ -106,30 +98,26 @@ export class PineconeService implements OnModuleInit {
   ): Promise<{ id: string; score: number; metadata: any }[]> {
     try {
       const index = this.pinecone.Index(this.indexName);
-      
       const queryResponse = await index.query({
-        queryRequest: {
-          vector: embedding,
-          topK,
-          includeMetadata: true,
-          namespace: this.namespace,
-        },
+        vector: embedding,
+        topK,
+        includeMetadata: true,
       });
 
-      // Filtrar por similaridade
       const matches = queryResponse.matches
-        ?.filter(match => match.score && match.score >= similarityThreshold)
+        ?.filter(match => match.score >= similarityThreshold)
         .map(match => ({
           id: match.id,
-          score: match.score || 0,
+          score: match.score,
           metadata: match.metadata,
         })) || [];
 
       this.logger.debug(`Encontrados ${matches.length} templates similares`);
       return matches;
-    } catch (error) {
-      this.logger.error(`Erro ao buscar templates similares: ${error.message}`, error.stack);
-      throw new Error(`Erro ao buscar templates similares: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao buscar templates similares: ${err.message}`, err.stack);
+      throw new Error(`Erro ao buscar templates similares: ${err.message}`);
     }
   }
 
@@ -141,21 +129,15 @@ export class PineconeService implements OnModuleInit {
    */
   async updateTemplate(id: string, updates: Partial<CacheTemplate>): Promise<boolean> {
     try {
-      // Buscar o template atual
       const index = this.pinecone.Index(this.indexName);
-      const fetchResponse = await index.fetch({
-        ids: [id],
-        namespace: this.namespace,
-      });
+      const fetchResponse = await index.fetch([id]);
 
-      if (!fetchResponse.vectors?.[id]) {
+      const vector = fetchResponse.records[id];
+      if (!vector) {
         throw new Error(`Template não encontrado: ${id}`);
       }
 
-      // Extrair metadados atuais
-      const currentMetadata = fetchResponse.vectors[id].metadata;
-      
-      // Mesclar com atualizações
+      const currentMetadata = vector.metadata;
       const updatedMetadata = {
         ...currentMetadata,
         updatedAt: new Date().toISOString(),
@@ -166,19 +148,16 @@ export class PineconeService implements OnModuleInit {
         }),
       };
 
-      // Atualizar no Pinecone
       await index.update({
-        updateRequest: {
-          id: id,
-          setMetadata: updatedMetadata,
-          namespace: this.namespace,
-        }
+        id,
+        metadata: updatedMetadata,
       });
 
       this.logger.log(`Template atualizado com sucesso: ${id}`);
       return true;
-    } catch (error) {
-      this.logger.error(`Erro ao atualizar template: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao atualizar template: ${err.message}`, err.stack);
       return false;
     }
   }
@@ -191,19 +170,13 @@ export class PineconeService implements OnModuleInit {
   async deleteTemplate(id: string): Promise<boolean> {
     try {
       const index = this.pinecone.Index(this.indexName);
-      
-      await index._delete({
-        deleteRequest: {
-          ids: [id],
-          namespace: this.namespace,
-        }
-      });
-
+      await index.deleteOne(id);
       this.logger.log(`Template excluído com sucesso: ${id}`);
       return true;
-    } catch (error) {
-      this.logger.error(`Erro ao excluir template: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao excluir template: ${err.message}`, err.stack);
       return false;
     }
   }
-} 
+}

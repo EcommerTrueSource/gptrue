@@ -1,2 +1,2 @@
 export * from './pinecone.service';
-export * from './pinecone.module'; 
+export * from './pinecone.module';

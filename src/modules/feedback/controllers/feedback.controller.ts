@@ -30,4 +30,4 @@ export class FeedbackController {
       patterns: this.feedbackService.identifyNegativeFeedbackPatterns(),
     };
   }
-} 
+}

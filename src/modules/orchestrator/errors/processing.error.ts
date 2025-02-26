@@ -1,9 +1,9 @@
 export class ProcessingError extends Error {
   constructor(
     message: string,
-    public readonly originalError?: Error
+    public readonly originalError?: Error,
   ) {
     super(message);
     this.name = 'ProcessingError';
   }
-} 
+}

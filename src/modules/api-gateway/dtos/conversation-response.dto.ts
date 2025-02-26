@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsBoolean, IsOptional, IsArray, ValidateNested, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsBoolean,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsObject,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class MetadataDto {
@@ -67,4 +75,4 @@ export class ConversationResponseDto {
   @ValidateNested()
   @Type(() => FeedbackOptionsDto)
   feedbackOptions: FeedbackOptionsDto;
-} 
+}

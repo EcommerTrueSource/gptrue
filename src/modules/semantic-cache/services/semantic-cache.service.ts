@@ -1,15 +1,16 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PineconeClient, Vector } from '@pinecone-database/pinecone';
+import { Pinecone, PineconeRecord } from '@pinecone-database/pinecone';
 import { v4 as uuidv4 } from 'uuid';
 import { CacheTemplate, SimilaritySearchResult, CacheConfig } from '../interfaces/cache.interface';
 import { ProcessingResult } from '../../orchestrator/interfaces/conversation.interface';
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import { PineconeMetadata } from '../interfaces/pinecone.interface';
 
 @Injectable()
 export class SemanticCacheService implements OnModuleInit {
   private readonly logger = new Logger(SemanticCacheService.name);
-  private pinecone: PineconeClient;
+  private pinecone: Pinecone;
   private embeddings: OpenAIEmbeddings;
   private config: CacheConfig;
 
@@ -29,15 +30,14 @@ export class SemanticCacheService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      this.pinecone = new PineconeClient();
-      await this.pinecone.init({
+      this.pinecone = new Pinecone({
         apiKey: this.configService.get<string>('pinecone.apiKey'),
-        environment: this.configService.get<string>('pinecone.environment'),
       });
 
       this.logger.log('Pinecone inicializado com sucesso');
     } catch (error) {
-      this.logger.error('Erro ao inicializar Pinecone:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao inicializar Pinecone:', errorMessage);
       throw error;
     }
   }
@@ -51,7 +51,6 @@ export class SemanticCacheService implements OnModuleInit {
         vector: embedding,
         topK: 1,
         includeMetadata: true,
-        namespace: this.config.namespace,
       });
 
       if (queryResult.matches.length === 0) {
@@ -65,19 +64,24 @@ export class SemanticCacheService implements OnModuleInit {
         return null;
       }
 
-      const template = match.metadata as CacheTemplate;
+      const metadata = match.metadata as PineconeMetadata;
+
       return {
-        message: template.response,
+        message: metadata.response,
         metadata: {
-          processingTimeMs: template.metadata.executionTimeMs,
+          processingTimeMs: metadata.executionTimeMs,
           source: 'cache',
           confidence: score,
-          tables: template.metadata.sourceTables,
-          sql: template.query,
+          tables: metadata.sourceTables,
+          sql: metadata.query,
         },
       };
     } catch (error) {
-      this.logger.error(`Erro ao buscar pergunta similar: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao buscar pergunta similar:', {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return null;
     }
   }
@@ -87,52 +91,42 @@ export class SemanticCacheService implements OnModuleInit {
       const embedding = await this.generateEmbedding(question);
       const index = this.pinecone.Index(this.configService.get<string>('pinecone.indexName'));
 
-      const template: CacheTemplate = {
+      const record: PineconeRecord<PineconeMetadata> = {
         id: uuidv4(),
-        question,
-        questionEmbedding: embedding,
-        query: result.metadata.sql,
-        response: result.message,
+        values: embedding,
         metadata: {
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          version: '1.0',
+          question,
+          response: result.message,
+          query: result.metadata.sql,
           executionTimeMs: result.metadata.processingTimeMs,
           sourceTables: result.metadata.tables || [],
-        },
-        feedback: {
-          positive: 0,
-          negative: 0,
-          comments: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: '1.0',
+          feedbackPositive: 0,
+          feedbackNegative: 0,
+          feedbackComments: [],
           needsReview: false,
         },
       };
 
-      if (this.config.ttlEnabled) {
-        const ttl = new Date();
-        ttl.setDate(ttl.getDate() + this.config.ttlDays);
-        template.ttl = ttl;
-      }
+      await index.upsert([record]);
 
-      await index.upsert({
-        upsertRequest: {
-          vectors: [{
-            id: template.id,
-            values: embedding,
-            metadata: template,
-          }],
-          namespace: this.config.namespace,
-        },
-      });
-
-      this.logger.debug(`Template armazenado com sucesso: ${template.id}`);
+      this.logger.debug(`Template armazenado com sucesso: ${record.id}`);
     } catch (error) {
-      this.logger.error(`Erro ao armazenar template: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao armazenar template:', {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     }
   }
 
-  async updateFeedback(question: string, feedback: { type: 'positive' | 'negative'; comment?: string }): Promise<void> {
+  async updateFeedback(
+    question: string,
+    feedback: { type: 'positive' | 'negative'; comment?: string },
+  ): Promise<void> {
     try {
       const embedding = await this.generateEmbedding(question);
       const index = this.pinecone.Index(this.configService.get<string>('pinecone.indexName'));
@@ -141,7 +135,6 @@ export class SemanticCacheService implements OnModuleInit {
         vector: embedding,
         topK: 1,
         includeMetadata: true,
-        namespace: this.config.namespace,
       });
 
       if (queryResult.matches.length === 0) {
@@ -149,34 +142,29 @@ export class SemanticCacheService implements OnModuleInit {
       }
 
       const match = queryResult.matches[0];
-      const template = match.metadata as CacheTemplate;
+      const metadata = match.metadata as PineconeMetadata;
 
-      // Atualizar feedback
-      if (feedback.type === 'positive') {
-        template.feedback.positive += 1;
-      } else {
-        template.feedback.negative += 1;
-      }
+      const updatedMetadata: PineconeMetadata = {
+        ...metadata,
+        feedbackPositive: feedback.type === 'positive' ? metadata.feedbackPositive + 1 : metadata.feedbackPositive,
+        feedbackNegative: feedback.type === 'negative' ? metadata.feedbackNegative + 1 : metadata.feedbackNegative,
+        feedbackComments: feedback.comment ? [...metadata.feedbackComments, feedback.comment] : metadata.feedbackComments,
+        needsReview: feedback.type === 'negative',
+        updatedAt: new Date().toISOString(),
+      };
 
-      if (feedback.comment) {
-        template.feedback.comments.push(feedback.comment);
-      }
-
-      template.feedback.needsReview = template.feedback.negative > template.feedback.positive;
-      template.metadata.updatedAt = new Date();
-
-      // Atualizar no Pinecone
       await index.update({
-        updateRequest: {
-          id: template.id,
-          setMetadata: template,
-          namespace: this.config.namespace,
-        },
+        id: match.id,
+        metadata: updatedMetadata,
       });
 
-      this.logger.debug(`Feedback atualizado para template: ${template.id}`);
+      this.logger.debug(`Feedback atualizado para template: ${match.id}`);
     } catch (error) {
-      this.logger.error(`Erro ao atualizar feedback: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao atualizar feedback:', {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     }
   }
@@ -186,8 +174,12 @@ export class SemanticCacheService implements OnModuleInit {
       const embeddings = await this.embeddings.embedQuery(text);
       return embeddings;
     } catch (error) {
-      this.logger.error(`Erro ao gerar embedding: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao gerar embedding:', {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     }
   }
-} 
+}

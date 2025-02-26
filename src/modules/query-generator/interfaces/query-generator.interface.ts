@@ -47,4 +47,4 @@ export interface GeneratedQuery {
     processingTime: string;
   };
   warnings?: string[];
-} 
+}

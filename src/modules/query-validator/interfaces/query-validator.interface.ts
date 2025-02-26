@@ -69,4 +69,37 @@ export interface SecurityPolicy {
     table: string;
     columns: string[];
   }[];
-} 
+}
+
+export interface QueryValidationResult {
+  isValid: boolean;
+  query: string;
+  message: string;
+  fields?: Array<{
+    name: string;
+    type: string;
+    mode: string;
+    description?: string;
+  }>;
+  statistics?: {
+    totalBytesProcessed: number;
+  };
+}
+
+export interface QueryField {
+  name: string;
+  type: string;
+  mode: string;
+  description?: string;
+}
+
+export interface QueryStatistics {
+  totalBytesProcessed: number;
+}
+
+export interface DryRunResult {
+  schema?: {
+    fields: QueryField[];
+  };
+  totalBytesProcessed: number;
+}

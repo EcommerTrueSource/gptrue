@@ -54,29 +54,29 @@ export class MonitoringService {
     try {
       // Registrar tempo total
       this.metrics.responseTime.total.push(timeMs);
-      
+
       // Manter apenas os últimos 1000 registros
       if (this.metrics.responseTime.total.length > 1000) {
         this.metrics.responseTime.total.shift();
       }
-      
+
       // Registrar por componente
       if (!this.metrics.responseTime.byComponent[component]) {
         this.metrics.responseTime.byComponent[component] = [];
       }
-      
+
       this.metrics.responseTime.byComponent[component].push(timeMs);
-      
+
       // Manter apenas os últimos 1000 registros por componente
       if (this.metrics.responseTime.byComponent[component].length > 1000) {
         this.metrics.responseTime.byComponent[component].shift();
       }
-      
+
       // Verificar alerta
       if (timeMs > this.alertThresholds.responseTime) {
         this.logger.warn(`Tempo de resposta alto (${timeMs}ms) no componente ${component}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao registrar tempo de resposta: ${error.message}`, error.stack);
     }
   }
@@ -93,16 +93,17 @@ export class MonitoringService {
       } else {
         this.metrics.cacheHitRate[type].misses++;
       }
-      
+
       // Verificar alerta
-      const totalAccesses = this.metrics.cacheHitRate[type].hits + this.metrics.cacheHitRate[type].misses;
+      const totalAccesses =
+        this.metrics.cacheHitRate[type].hits + this.metrics.cacheHitRate[type].misses;
       if (totalAccesses > 100) {
         const hitRate = this.metrics.cacheHitRate[type].hits / totalAccesses;
         if (hitRate < this.alertThresholds.cacheHitRate) {
           this.logger.warn(`Taxa de acerto de cache ${type} baixa: ${(hitRate * 100).toFixed(2)}%`);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao registrar acesso ao cache: ${error.message}`, error.stack);
     }
   }
@@ -118,16 +119,18 @@ export class MonitoringService {
       } else {
         this.metrics.sqlGeneration.failure++;
       }
-      
+
       // Verificar alerta
       const total = this.metrics.sqlGeneration.success + this.metrics.sqlGeneration.failure;
       if (total > 50) {
         const failureRate = this.metrics.sqlGeneration.failure / total;
         if (failureRate > this.alertThresholds.sqlGenerationFailureRate) {
-          this.logger.warn(`Taxa de falha na geração de SQL alta: ${(failureRate * 100).toFixed(2)}%`);
+          this.logger.warn(
+            `Taxa de falha na geração de SQL alta: ${(failureRate * 100).toFixed(2)}%`,
+          );
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao registrar geração de SQL: ${error.message}`, error.stack);
     }
   }
@@ -143,7 +146,7 @@ export class MonitoringService {
       } else {
         this.metrics.feedback.negative++;
       }
-      
+
       // Verificar alerta
       const total = this.metrics.feedback.positive + this.metrics.feedback.negative;
       if (total > 50) {
@@ -152,7 +155,7 @@ export class MonitoringService {
           this.logger.warn(`Taxa de feedback negativo alta: ${(negativeRate * 100).toFixed(2)}%`);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao registrar feedback: ${error.message}`, error.stack);
     }
   }
@@ -165,7 +168,7 @@ export class MonitoringService {
   recordApiCost(api: 'vertexAI' | 'openAI', cost: number): void {
     try {
       this.metrics.apiCosts[api] += cost;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao registrar custo de API: ${error.message}`, error.stack);
     }
   }
@@ -183,21 +186,21 @@ export class MonitoringService {
         stack: error.stack,
         timestamp: new Date(),
       });
-      
+
       // Manter apenas os últimos 100 erros
       if (this.metrics.errors.length > 100) {
         this.metrics.errors.shift();
       }
-      
+
       // Verificar alerta
       const recentErrors = this.metrics.errors.filter(
-        e => e.timestamp > new Date(Date.now() - 3600000) // Última hora
+        e => e.timestamp > new Date(Date.now() - 3600000), // Última hora
       );
-      
+
       if (recentErrors.length > 10) {
         this.logger.warn(`Alta taxa de erros na última hora: ${recentErrors.length} erros`);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao registrar erro: ${error.message}`, error.stack);
     }
   }
@@ -217,23 +220,25 @@ export class MonitoringService {
   getAggregatedMetrics(): any {
     try {
       // Calcular tempo médio de resposta
-      const avgResponseTime = this.metrics.responseTime.total.length > 0
-        ? this.metrics.responseTime.total.reduce((sum, time) => sum + time, 0) / this.metrics.responseTime.total.length
-        : 0;
-      
+      const avgResponseTime =
+        this.metrics.responseTime.total.length > 0
+          ? this.metrics.responseTime.total.reduce((sum, time) => sum + time, 0) /
+            this.metrics.responseTime.total.length
+          : 0;
+
       // Calcular taxa de acerto de cache
       const semanticCacheHitRate = this.getTotalCacheHitRate('semantic');
       const redisCacheHitRate = this.getTotalCacheHitRate('redis');
-      
+
       // Calcular taxa de sucesso na geração de SQL
       const sqlGenerationSuccessRate = this.getSqlGenerationSuccessRate();
-      
+
       // Calcular taxa de feedback positivo
       const positiveFeedbackRate = this.getPositiveFeedbackRate();
-      
+
       // Calcular custos totais de API
       const totalApiCosts = this.metrics.apiCosts.vertexAI + this.metrics.apiCosts.openAI;
-      
+
       return {
         avgResponseTime,
         semanticCacheHitRate,
@@ -243,10 +248,10 @@ export class MonitoringService {
         totalApiCosts,
         errorCount: this.metrics.errors.length,
         recentErrorCount: this.metrics.errors.filter(
-          e => e.timestamp > new Date(Date.now() - 3600000) // Última hora
+          e => e.timestamp > new Date(Date.now() - 3600000), // Última hora
         ).length,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao calcular métricas agregadas: ${error.message}`, error.stack);
       return {};
     }
@@ -311,4 +316,4 @@ export class MonitoringService {
       errors: [],
     };
   }
-} 
+}

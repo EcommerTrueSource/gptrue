@@ -1,19 +1,21 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
-import { QueueService } from './queue.service';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { QueryProcessor } from './processors/query-processor';
+import { ResponseProcessor } from './processors/response-processor';
+import { BigQueryModule } from '../../database/bigquery/bigquery.module';
+import { ResponseGeneratorModule } from '../../modules/response-generator/response-generator.module';
 
 @Module({
   imports: [
-    ConfigModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      useFactory: async (configService: ConfigService) => ({
         redis: {
-          host: configService.get<string>('redis.host') || 'localhost',
-          port: configService.get<number>('redis.port') || 6379,
-          password: configService.get<string>('redis.password'),
+          host: configService.get<string>('app.redis.host') || 'localhost',
+          port: configService.get<number>('app.redis.port') || 6379,
+          password: configService.get<string>('app.redis.password'),
         },
         defaultJobOptions: {
           attempts: 3,
@@ -34,8 +36,10 @@ import { QueueService } from './queue.service';
         name: 'response-generation',
       },
     ),
+    BigQueryModule,
+    ResponseGeneratorModule,
   ],
-  providers: [QueueService],
-  exports: [QueueService, BullModule],
+  providers: [QueryProcessor, ResponseProcessor],
+  exports: [BullModule],
 })
-export class QueueModule {} 
+export class QueueModule {}

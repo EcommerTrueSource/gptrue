@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { OpenAIMessage } from './interfaces/openai.interface';
+import { ChatCompletionMessageParam } from 'openai/resources/chat';
 
 @Injectable()
 export class OpenAIApiService implements OnModuleInit {
@@ -20,13 +21,15 @@ export class OpenAIApiService implements OnModuleInit {
 
       this.embeddings = new OpenAIEmbeddings({
         openAIApiKey: this.configService.get<string>('ai.openai.apiKey'),
-        modelName: this.configService.get<string>('ai.openai.embeddingModel') || 'text-embedding-ada-002',
+        modelName:
+          this.configService.get<string>('ai.openai.embeddingModel') || 'text-embedding-ada-002',
       });
 
       this.logger.log('OpenAI inicializado com sucesso');
-    } catch (error) {
-      this.logger.error(`Erro ao inicializar OpenAI: ${error.message}`, error.stack);
-      throw error;
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao inicializar OpenAI: ${err.message}`, err.stack);
+      throw err;
     }
   }
 
@@ -39,9 +42,10 @@ export class OpenAIApiService implements OnModuleInit {
     try {
       const result = await this.embeddings.embedQuery(text);
       return result;
-    } catch (error) {
-      this.logger.error(`Erro ao gerar embedding: ${error.message}`, error.stack);
-      throw new Error(`Falha ao gerar embedding: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao gerar embedding: ${err.message}`, err.stack);
+      throw new Error(`Falha ao gerar embedding: ${err.message}`);
     }
   }
 
@@ -62,20 +66,23 @@ export class OpenAIApiService implements OnModuleInit {
     try {
       const { temperature = 0.7, maxTokens = 2000, model = 'gpt-4' } = options;
 
+      const formattedMessages: ChatCompletionMessageParam[] = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
       const response = await this.openai.chat.completions.create({
         model: model,
-        messages: messages.map(msg => ({
-          role: msg.role as any,
-          content: msg.content,
-        })) as any,
+        messages: formattedMessages,
         temperature: temperature,
         max_tokens: maxTokens,
       });
 
       return response.choices[0]?.message?.content || '';
-    } catch (error) {
-      this.logger.error(`Erro ao gerar texto: ${error.message}`, error.stack);
-      throw new Error(`Falha ao gerar texto: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao gerar texto: ${err.message}`, err.stack);
+      throw new Error(`Falha ao gerar texto: ${err.message}`);
     }
   }
 
@@ -83,24 +90,25 @@ export class OpenAIApiService implements OnModuleInit {
    * Método de fallback para quando a API principal falha
    * Usa um modelo menor/mais rápido
    */
-  async generateTextFallback(
-    messages: OpenAIMessage[],
-  ): Promise<string> {
+  async generateTextFallback(messages: OpenAIMessage[]): Promise<string> {
     try {
+      const formattedMessages: ChatCompletionMessageParam[] = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
       const response = await this.openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
-        messages: messages.map(msg => ({
-          role: msg.role as any,
-          content: msg.content,
-        })) as any,
+        messages: formattedMessages,
         temperature: 0.5,
         max_tokens: 1000,
       });
 
       return response.choices[0]?.message?.content || '';
-    } catch (error) {
-      this.logger.error(`Erro no fallback: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro no fallback: ${err.message}`, err.stack);
       return 'Não foi possível gerar uma resposta no momento. Por favor, tente novamente mais tarde.';
     }
   }
-} 
+}

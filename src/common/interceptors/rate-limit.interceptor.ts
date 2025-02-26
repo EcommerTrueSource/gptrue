@@ -9,12 +9,13 @@ import {
 import { Observable } from 'rxjs';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { ConfigService } from '@nestjs/config';
+import { RedisCacheService } from '../cache/redis-cache.service';
 
 @Injectable()
 export class RateLimitInterceptor implements NestInterceptor {
   private rateLimiter: RateLimiterMemory;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService, private redisCache: RedisCacheService) {
     const points = this.configService.get('app.rateLimiting.points');
     const duration = this.configService.get('app.rateLimiting.duration');
 
@@ -24,21 +25,18 @@ export class RateLimitInterceptor implements NestInterceptor {
     });
   }
 
-  async intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Promise<Observable<any>> {
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
     const key = request.ip;
 
     try {
       await this.rateLimiter.consume(key);
       return next.handle();
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         'Muitas requisições. Por favor, tente novamente mais tarde.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
   }
-} 
+}

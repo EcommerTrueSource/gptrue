@@ -1,2 +1,2 @@
 export * from './openai-api.service';
-export * from './openai.module'; 
+export * from './openai.module';

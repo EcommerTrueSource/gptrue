@@ -29,7 +29,13 @@ export const TABLE_SCHEMAS: TableSchema[] = [
         name: 'situacao',
         type: 'STRING',
         description: 'Status atual do pedido',
-        examples: ['Aguardando pagamento', 'Pagamento aprovado', 'Em separação', 'Enviado', 'Entregue'],
+        examples: [
+          'Aguardando pagamento',
+          'Pagamento aprovado',
+          'Em separação',
+          'Enviado',
+          'Entregue',
+        ],
         isSearchable: true,
       },
       {
@@ -292,7 +298,7 @@ export const TABLE_SCHEMAS: TableSchema[] = [
         table: 'CLIENTES',
         field: 'customerEmail',
         foreignField: 'clientProfileData_email',
-        type: 'many-to-one',
+        type: 'one-to-many',
         description: 'Relacionamento com o cadastro do cliente',
       },
     ],
@@ -362,4 +368,4 @@ export const TABLE_SCHEMAS: TableSchema[] = [
       },
     ],
   },
-]; 
+];

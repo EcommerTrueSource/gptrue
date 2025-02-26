@@ -7,4 +7,4 @@ import { MonitoringService } from './monitoring.service';
   providers: [MonitoringService],
   exports: [MonitoringService],
 })
-export class MonitoringModule {} 
+export class MonitoringModule {}

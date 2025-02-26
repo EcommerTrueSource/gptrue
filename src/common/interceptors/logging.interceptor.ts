@@ -11,23 +11,17 @@ export class LoggingInterceptor implements NestInterceptor {
   constructor(private readonly configService: ConfigService) {
     this.logger = winston.createLogger({
       level: this.configService.get('app.logging.level'),
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json(),
-      ),
+      format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
       transports: [
         new winston.transports.Console({
-          format: winston.format.combine(
-            winston.format.colorize(),
-            winston.format.simple(),
-          ),
+          format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
         }),
       ],
     });
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request>();
     const { method, url, body, headers } = request;
     const startTime = Date.now();
 
@@ -39,7 +33,7 @@ export class LoggingInterceptor implements NestInterceptor {
             method,
             url,
             body,
-            headers: this.sanitizeHeaders(headers),
+            headers: this.sanitizeHeaders(headers as any),
             responseTime: `${endTime - startTime}ms`,
             response: data,
           });
@@ -50,7 +44,7 @@ export class LoggingInterceptor implements NestInterceptor {
             method,
             url,
             body,
-            headers: this.sanitizeHeaders(headers),
+            headers: this.sanitizeHeaders(headers as any),
             responseTime: `${endTime - startTime}ms`,
             error: {
               message: error.message,
@@ -67,4 +61,4 @@ export class LoggingInterceptor implements NestInterceptor {
     delete sanitized.authorization;
     return sanitized;
   }
-} 
+}

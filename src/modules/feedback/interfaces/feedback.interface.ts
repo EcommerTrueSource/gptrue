@@ -35,4 +35,4 @@ export interface FeedbackPattern {
   category: string;
   count: number;
   percentage: number;
-} 
+}

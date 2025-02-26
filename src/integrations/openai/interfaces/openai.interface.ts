@@ -21,4 +21,4 @@ export interface TextGenerationOptions {
 export interface OpenAIPrompt {
   messages: OpenAIMessage[];
   options?: TextGenerationOptions;
-} 
+}

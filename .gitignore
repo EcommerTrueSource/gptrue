@@ -1,78 +1,68 @@
-# compiled output
-/dist
-/node_modules
+# Dependências
+node_modules/
+dist/
+build/
 
-# Logs
-logs
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Arquivos de log
+logs/
 *.log
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
 
-# OS
+# Arquivos de sistema
 .DS_Store
+Thumbs.db
 
-# Tests
-/coverage
-/.nyc_output
-
-# IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
+# Arquivos de IDE
+.idea/
+.vscode/
+*.sublime-project
 *.sublime-workspace
 
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# Arquivos de teste
+coverage/
+.nyc_output/
 
-# Environment variables
-.env
-.env.*
-!.env.example
-.env.local
-.env.development
-.env.production
-.env.test
-
-# Google Cloud credentials
-*credentials*.json
-*key*.json
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# Build files
-build/
-dist/
+# Arquivos de build
+*.tsbuildinfo
+.next/
 out/
 
-# Debug files
-debug/
-.debug/
-
-# Local development
-docker-compose.override.yml
-.docker/
-
-# Pinecone and other service credentials
+# Arquivos de chave
 *.pem
 *.key
 *.crt
-*.cert
+*.csr
+*.p12
+*.pfx
+*.keystore
+*.jks
+*.p8
+*.p7b
+*.der
+*.cer
+*.crl
+*.srl
+*.sst
+*.csr
+*.crt
+*.key
+*.pem
+*.json
 
-# Misc
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
+# Outros
+.cache/
+.temp/
+.tmp/
+temp/
+tmp/
+.history/

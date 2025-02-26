@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsObject, ValidateNested, IsNumber, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsObject,
+  ValidateNested,
+  IsNumber,
+  IsBoolean,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class TimeRangeDto {
@@ -47,9 +54,20 @@ export class ConversationRequestDto {
   conversationId?: string;
 
   @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => ContextDto)
-  context?: ContextDto;
+  context?: {
+    timeRange?: {
+      start: Date;
+      end: Date;
+    };
+    filters?: Record<string, any>;
+    preferredVisualization?: string;
+  };
 
   @IsOptional()
   @ValidateNested()
@@ -62,11 +80,12 @@ export class ConversationResponseDto {
   conversationId: string;
   message: string;
   metadata: {
-    processingTimeMs: number;
-    source: 'cache' | 'query';
-    confidence: number;
+    processingTimeMs?: number;
+    source?: 'cache' | 'query';
+    confidence?: number;
     tables?: string[];
     sql?: string;
+    [key: string]: any;
   };
   data?: {
     type: 'table' | 'scalar' | 'chart';
@@ -78,4 +97,4 @@ export class ConversationResponseDto {
     thumbsDown: boolean;
     commentEnabled: boolean;
   };
-} 
+}

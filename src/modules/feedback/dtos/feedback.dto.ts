@@ -31,4 +31,4 @@ export class FeedbackDto {
   @IsOptional()
   @IsString({ message: 'O ID da conversa deve ser uma string' })
   conversationId?: string;
-} 
+}

@@ -1,23 +1,35 @@
 import { registerAs } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 
-export default registerAs('bigquery', () => ({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  location: process.env.BIGQUERY_LOCATION || 'US',
-  dataset: process.env.BIGQUERY_DATASET,
-  maxBytesProcessed: parseInt(process.env.BIGQUERY_MAX_BYTES_PROCESSED, 10) || 1000000000, // 1GB
-  timeoutMs: parseInt(process.env.BIGQUERY_TIMEOUT_MS, 10) || 30000, // 30 segundos
-  tables: {
-    pedidos: 'PEDIDOS',
-    produtos: 'PRODUTOS',
-    assinatura: 'ASSINATURA',
-    clientes: 'CLIENTES',
-    statusClientes: 'STATUS_CLIENTES',
-    statusAssinantes: 'STATUS_ASSINANTES',
-  },
-  querySettings: {
-    maximumBytesBilled: process.env.BIGQUERY_MAXIMUM_BYTES_BILLED || '1000000000000',
-    useQueryCache: process.env.BIGQUERY_USE_QUERY_CACHE !== 'false',
-    maximumResults: parseInt(process.env.BIGQUERY_MAXIMUM_RESULTS || '1000', 10),
-  },
-})); 
+export interface BigQueryConfig {
+  projectId: string;
+  keyFilename: string;
+  location: string;
+  maxBytes: string;
+  enabled: boolean;
+}
+
+export default registerAs('bigquery', (): BigQueryConfig => {
+  const logger = new Logger('BigQueryConfig');
+  const projectId = process.env.BIGQUERY_PROJECT_ID;
+  const keyFilename = process.env.BIGQUERY_KEY_FILE;
+  let enabled = true;
+  
+  if (!projectId) {
+    logger.warn('BIGQUERY_PROJECT_ID não definido, BigQuery será desabilitado');
+    enabled = false;
+  }
+  
+  if (!keyFilename) {
+    logger.warn('BIGQUERY_KEY_FILE não definido, BigQuery será desabilitado');
+    enabled = false;
+  }
+  
+  return {
+    projectId: projectId || 'mock-project-id',
+    keyFilename: keyFilename || './keys/bigquery-dev.json',
+    location: process.env.BIGQUERY_LOCATION || 'US',
+    maxBytes: process.env.BIGQUERY_MAX_BYTES || '1073741824', // 1GB em bytes
+    enabled,
+  };
+});

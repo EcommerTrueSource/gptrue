@@ -6,29 +6,30 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - '3000:3000'
     volumes:
-      - .:/app
-      - /app/node_modules
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
     environment:
       - NODE_ENV=development
-      - PORT=3000
-      - CLERK_SECRET_KEY=your_clerk_secret_key
-      - CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-      - RATE_LIMIT_POINTS=100
-      - RATE_LIMIT_DURATION=60
-      - CORS_ORIGIN=http://localhost:3000
+    env_file:
+      - .env
     command: npm run start:dev
     networks:
       - gptrue-network
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
     networks:
       - gptrue-network
 
+volumes:
+  redis-data:
+
 networks:
   gptrue-network:
-    driver: bridge 
+    driver: bridge

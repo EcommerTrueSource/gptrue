@@ -36,4 +36,4 @@ export interface SqlQueryResult {
     type: 'select' | 'aggregate';
     complexity: number;
   };
-} 
+}

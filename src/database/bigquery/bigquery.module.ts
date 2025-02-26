@@ -7,4 +7,4 @@ import { BigQueryService } from './bigquery.service';
   providers: [BigQueryService],
   exports: [BigQueryService],
 })
-export class BigQueryModule {} 
+export class BigQueryModule {}

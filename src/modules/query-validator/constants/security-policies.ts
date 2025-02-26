@@ -15,17 +15,11 @@ export const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
   restrictedColumns: [
     {
       table: 'CLIENTES',
-      columns: [
-        'clientProfileData_document',
-        'clientProfileData_phone',
-      ],
+      columns: ['clientProfileData_document', 'clientProfileData_phone'],
     },
     {
       table: 'PEDIDOS',
-      columns: [
-        'cuponsJSON',
-        'promocoesJSON',
-      ],
+      columns: ['cuponsJSON', 'promocoesJSON'],
     },
   ],
-}; 
+};

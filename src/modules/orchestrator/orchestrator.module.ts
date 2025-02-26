@@ -5,12 +5,8 @@ import { QueryGeneratorModule } from '../query-generator/query-generator.module'
 import { ResponseGeneratorModule } from '../response-generator/response-generator.module';
 
 @Module({
-  imports: [
-    BigQueryModule,
-    QueryGeneratorModule,
-    ResponseGeneratorModule,
-  ],
+  imports: [BigQueryModule, QueryGeneratorModule, ResponseGeneratorModule],
   providers: [OrchestratorService],
   exports: [OrchestratorService],
 })
-export class OrchestratorModule {} 
+export class OrchestratorModule {}

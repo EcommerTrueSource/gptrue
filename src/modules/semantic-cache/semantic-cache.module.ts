@@ -7,4 +7,4 @@ import { SemanticCacheService } from './services/semantic-cache.service';
   providers: [SemanticCacheService],
   exports: [SemanticCacheService],
 })
-export class SemanticCacheModule {} 
+export class SemanticCacheModule {}

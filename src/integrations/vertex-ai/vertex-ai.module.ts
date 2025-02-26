@@ -7,4 +7,4 @@ import { VertexAIService } from './vertex-ai.service';
   providers: [VertexAIService],
   exports: [VertexAIService],
 })
-export class VertexAIModule {} 
+export class VertexAIModule {}

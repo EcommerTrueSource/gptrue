@@ -27,8 +27,15 @@ export class FeedbackService {
    */
   async processFeedback(feedback: FeedbackDto): Promise<{ success: boolean; message: string }> {
     try {
-      this.logger.log(`Processando feedback: ${JSON.stringify(feedback)}`);
-      
+      this.logger.debug('Iniciando processamento de feedback', {
+        type: feedback.type,
+        category: feedback.category,
+        hasComment: !!feedback.comment,
+      });
+
+      // Validar feedback
+      this.validateFeedback(feedback);
+
       // Atualizar o template no cache semântico
       await this.semanticCacheService.updateFeedback(feedback.question, {
         type: feedback.type,
@@ -43,15 +50,29 @@ export class FeedbackService {
         this.addToReviewQueue(feedback);
       }
 
-      return { 
-        success: true, 
-        message: 'Feedback processado com sucesso' 
+      this.logger.log('Feedback processado com sucesso', {
+        type: feedback.type,
+        category: feedback.category,
+      });
+
+      return {
+        success: true,
+        message: 'Feedback processado com sucesso',
       };
-    } catch (error) {
-      this.logger.error(`Erro ao processar feedback: ${error.message}`, error.stack);
-      return { 
-        success: false, 
-        message: `Erro ao processar feedback: ${error.message}` 
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error('Erro ao processar feedback', {
+        error: err.message,
+        stack: err.stack,
+        feedback: {
+          type: feedback.type,
+          category: feedback.category,
+        },
+      });
+
+      return {
+        success: false,
+        message: `Erro ao processar feedback: ${err.message}`,
       };
     }
   }
@@ -65,12 +86,29 @@ export class FeedbackService {
   }
 
   /**
+   * Valida o feedback recebido
+   * @param feedback Feedback para validar
+   * @throws Error se o feedback for inválido
+   */
+  private validateFeedback(feedback: FeedbackDto): void {
+    if (!feedback.question) {
+      throw new Error('A pergunta é obrigatória');
+    }
+    if (!feedback.type || !['positive', 'negative'].includes(feedback.type)) {
+      throw new Error('Tipo de feedback inválido');
+    }
+    if (feedback.type === 'negative' && !feedback.comment) {
+      throw new Error('Comentário obrigatório para feedback negativo');
+    }
+  }
+
+  /**
    * Atualiza métricas de feedback
    * @param feedback Feedback do usuário
    */
   private updateAnalytics(feedback: FeedbackDto): void {
     this.feedbackAnalytics.totalFeedback++;
-    
+
     if (feedback.type === 'positive') {
       this.feedbackAnalytics.positiveFeedback++;
     } else {
@@ -88,7 +126,7 @@ export class FeedbackService {
       }
 
       this.feedbackAnalytics.feedbackByCategory[feedback.category].total++;
-      
+
       if (feedback.type === 'positive') {
         this.feedbackAnalytics.feedbackByCategory[feedback.category].positive++;
       } else {
@@ -102,8 +140,10 @@ export class FeedbackService {
    * @param feedback Feedback negativo
    */
   private addToReviewQueue(feedback: FeedbackDto): void {
-    // Manter apenas os últimos 100 feedbacks negativos
-    if (this.feedbackAnalytics.recentNegativeFeedback.length >= 100) {
+    const maxQueueSize = this.configService.get<number>('app.feedback.maxQueueSize') || 100;
+
+    // Manter apenas os últimos N feedbacks negativos
+    if (this.feedbackAnalytics.recentNegativeFeedback.length >= maxQueueSize) {
       this.feedbackAnalytics.recentNegativeFeedback.shift();
     }
 
@@ -114,7 +154,11 @@ export class FeedbackService {
       category: feedback.category,
     });
 
-    this.logger.log(`Feedback negativo adicionado à fila de revisão: ${feedback.question}`);
+    this.logger.debug('Feedback negativo adicionado à fila de revisão', {
+      question: feedback.question,
+      category: feedback.category,
+      queueSize: this.feedbackAnalytics.recentNegativeFeedback.length,
+    });
   }
 
   /**
@@ -123,16 +167,16 @@ export class FeedbackService {
    */
   identifyNegativeFeedbackPatterns(): { category: string; count: number }[] {
     const categoryCounts: Record<string, number> = {};
-    
+
     // Contar ocorrências por categoria
     this.feedbackAnalytics.recentNegativeFeedback.forEach(feedback => {
       const category = feedback.category || 'sem_categoria';
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     });
-    
+
     // Converter para array e ordenar
     return Object.entries(categoryCounts)
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => b.count - a.count);
   }
-} 
+}

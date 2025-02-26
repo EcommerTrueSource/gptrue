@@ -1,5 +1,15 @@
 # Projeto GPTrue - Chatbot Generativo para Análise de Dados de E-commerce
 
+### Regras para o Agent
+- Você é um desenvolvedor de software Fullstack sênior com mais de 10 anos de experiência com NestJS, TypeScript, BigQuery, Pinecone, OpenAI, Vertex AI, LangChain, entre outras tecnologias.
+- O chatbot deve ser capaz de responder perguntas do usuário em linguagem natural, baseado nos dados armazenados no BigQuery.
+- O chatbot deve ser capaz de gerar consultas SQL para responder as perguntas do usuário, e executar as consultas no BigQuery.
+- O chatbot deve ser capaz de armazenar as consultas e respostas no Pinecone para reutilização futura.
+- O chatbot deve ser capaz de receber feedback do usuário sobre as respostas, e atualizar as informações armazenadas no Pinecone com base no feedback.
+- O chatbot deve ser capaz de fornecer sugestões de perguntas relacionadas ao feedback do usuário.
+- O chatbot deve ser capaz de fornecer métricas de performance para análise e melhoria contínua.
+
+
 ## Descrição do projeto
 O GPTrue é um chatbot generativo integrado ao "Painel True", desenvolvido para fornecer insights e análises sobre dados de e-commerce armazenados no BigQuery. O sistema permite que usuários façam perguntas em linguagem natural sobre pedidos, produtos, vendas, assinantes, e outras métricas de negócio, e recebam respostas contextualizadas baseadas nos dados reais da plataforma. O sistema utiliza uma combinação de busca vetorial e geração dinâmica de consultas SQL para fornecer respostas precisas e eficientes, enquanto aprende continuamente através de feedback dos usuários.
 
@@ -447,7 +457,7 @@ src/
 1. Verificação no cache (assumindo miss)
 2. Geração de SQL:
    ```sql
-   SELECT 
+   SELECT
      p.NameComplete as nome_produto,
      SUM(i.quantidade) as total_vendido
    FROM PEDIDOS as o
@@ -480,12 +490,12 @@ src/
 2. Geração de SQL (simplificado):
    ```sql
    WITH assinaturas_ativas AS (
-     SELECT 
+     SELECT
        COUNT(DISTINCT customerId) as total_assinantes,
        DATE_TRUNC(data_atualizacao_warehouse, MONTH) as mes
      FROM STATUS_ASSINANTES
-     WHERE 
-       status = 'ACTIVE' 
+     WHERE
+       status = 'ACTIVE'
        AND data_atualizacao_warehouse >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
      GROUP BY mes
    ),
@@ -494,7 +504,7 @@ src/
        COUNT(DISTINCT a.id) as renovacoes,
        DATE_TRUNC(a.lastPurchaseDate, MONTH) as mes
      FROM ASSINATURA a
-     WHERE 
+     WHERE
        a.cycleCount > 1
        AND a.plan.frequency.periodicity = 'monthly'
        AND a.lastPurchaseDate >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
@@ -513,12 +523,12 @@ src/
 4. Formatação da resposta:
    ```
    A taxa média de renovação das assinaturas mensais nos últimos 3 meses foi de 87.3%.
-   
+
    Detalhamento por mês:
    - Dezembro/2024: 89.2% (842 renovações de 944 assinantes)
    - Janeiro/2025: 86.7% (832 renovações de 960 assinantes)
    - Fevereiro/2025: 85.9% (815 renovações de 949 assinantes)
-   
+
    Observa-se uma tendência de leve queda na taxa de renovação nos últimos meses.
    ```
 
@@ -559,4 +569,13 @@ Para garantir a geração de consultas SQL de alta qualidade:
 - Use o git como sistema de versionamento
 - Use o github como plataforma de hospedagem do repositório
 
+### Variaveis de ambiente
+- Use o .env.local para armazenar as variáveis de ambiente do projeto local
+- Use o .env.development para armazenar as variáveis de ambiente do projeto de desenvolvimento
+- Use o .env.production para armazenar as variáveis de ambiente do projeto de produção
+- Use o .env para armazenar as variáveis de ambiente do projeto
+- Use o .env.example para armazenar as variáveis de ambiente do projeto
+- Use o .env.local para armazenar as variáveis de ambiente do projeto local
+- Use o .env.development para armazenar as variáveis de ambiente do projeto de desenvolvimento
+- Use o .env.production para armazenar as variáveis de ambiente do projeto de produção
 

@@ -32,4 +32,4 @@ export class ConversationRequestDto {
   @ValidateNested()
   @Type(() => Context)
   context?: Context;
-} 
+}

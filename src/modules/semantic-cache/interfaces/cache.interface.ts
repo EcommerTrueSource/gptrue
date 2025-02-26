@@ -32,4 +32,4 @@ export interface CacheConfig {
   ttlEnabled: boolean;
   ttlDays: number;
   namespace: string;
-} 
+}

@@ -93,4 +93,4 @@ export interface OpenAIPrompt {
     user: string;
     assistant: string;
   }[];
-} 
+}

@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { QueryValidatorService } from './services/query-validator.service';
+import { BigQueryModule } from '../../database/bigquery/bigquery.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [BigQueryModule],
   providers: [QueryValidatorService],
   exports: [QueryValidatorService],
 })
-export class QueryValidatorModule {} 
+export class QueryValidatorModule {}

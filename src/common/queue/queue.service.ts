@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -66,11 +66,15 @@ export class QueueService {
    * @param jobId ID do job
    * @returns Status do job
    */
-  async getJobStatus(queueName: 'query-processing' | 'response-generation', jobId: string): Promise<any> {
+  async getJobStatus(
+    queueName: 'query-processing' | 'response-generation',
+    jobId: string,
+  ): Promise<any> {
     try {
-      const queue = queueName === 'query-processing' ? this.queryProcessingQueue : this.responseGenerationQueue;
+      const queue =
+        queueName === 'query-processing' ? this.queryProcessingQueue : this.responseGenerationQueue;
       const job = await queue.getJob(jobId);
-      
+
       if (!job) {
         return { status: 'not_found' };
       }
@@ -99,11 +103,15 @@ export class QueueService {
    * @param jobId ID do job
    * @returns Confirmação de cancelamento
    */
-  async cancelJob(queueName: 'query-processing' | 'response-generation', jobId: string): Promise<boolean> {
+  async cancelJob(
+    queueName: 'query-processing' | 'response-generation',
+    jobId: string,
+  ): Promise<boolean> {
     try {
-      const queue = queueName === 'query-processing' ? this.queryProcessingQueue : this.responseGenerationQueue;
+      const queue =
+        queueName === 'query-processing' ? this.queryProcessingQueue : this.responseGenerationQueue;
       const job = await queue.getJob(jobId);
-      
+
       if (!job) {
         return false;
       }
@@ -116,4 +124,4 @@ export class QueueService {
       return false;
     }
   }
-} 
+}

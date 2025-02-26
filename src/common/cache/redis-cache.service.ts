@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class RedisCacheService {
@@ -18,8 +18,12 @@ export class RedisCacheService {
     try {
       const value = await this.cacheManager.get<T>(key);
       return value || null;
-    } catch (error) {
-      this.logger.error(`Erro ao obter valor do cache: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(
+        `Erro ao obter valor do cache: ${err.message}`,
+        err.stack,
+      );
       return null;
     }
   }
@@ -31,12 +35,13 @@ export class RedisCacheService {
    * @param ttl Tempo de vida em segundos (opcional)
    * @returns Confirmação de armazenamento
    */
-  async set(key: string, value: any, ttl: number = this.defaultTTL): Promise<boolean> {
+  async set(key: string, value: unknown, ttl: number = this.defaultTTL): Promise<boolean> {
     try {
       await this.cacheManager.set(key, value, ttl);
       return true;
-    } catch (error) {
-      this.logger.error(`Erro ao armazenar valor no cache: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao armazenar valor no cache: ${err.message}`, err.stack);
       return false;
     }
   }
@@ -50,8 +55,9 @@ export class RedisCacheService {
     try {
       await this.cacheManager.del(key);
       return true;
-    } catch (error) {
-      this.logger.error(`Erro ao remover valor do cache: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao remover valor do cache: ${err.message}`, err.stack);
       return false;
     }
   }
@@ -65,8 +71,9 @@ export class RedisCacheService {
     try {
       const value = await this.cacheManager.get(key);
       return value !== undefined && value !== null;
-    } catch (error) {
-      this.logger.error(`Erro ao verificar existência no cache: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao verificar existência no cache: ${err.message}`, err.stack);
       return false;
     }
   }
@@ -77,11 +84,11 @@ export class RedisCacheService {
    */
   async reset(): Promise<boolean> {
     try {
-      // @ts-ignore - A tipagem está incorreta, mas o método existe
-      await this.cacheManager.store.reset();
+      await this.cacheManager.reset();
       return true;
-    } catch (error) {
-      this.logger.error(`Erro ao limpar cache: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao limpar cache: ${err.message}`, err.stack);
       return false;
     }
   }
@@ -94,19 +101,20 @@ export class RedisCacheService {
   async mget<T>(keys: string[]): Promise<Map<string, T>> {
     try {
       const result = new Map<string, T>();
-      
+
       // Executar em paralelo para melhor performance
-      const promises = keys.map(async (key) => {
+      const promises = keys.map(async key => {
         const value = await this.cacheManager.get<T>(key);
         if (value !== undefined && value !== null) {
           result.set(key, value);
         }
       });
-      
+
       await Promise.all(promises);
       return result;
-    } catch (error) {
-      this.logger.error(`Erro ao obter múltiplos valores do cache: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Erro ao obter múltiplos valores do cache: ${err.message}`, err.stack);
       return new Map<string, T>();
     }
   }
@@ -117,18 +125,22 @@ export class RedisCacheService {
    * @param ttl Tempo de vida em segundos (opcional)
    * @returns Confirmação de armazenamento
    */
-  async mset(entries: Map<string, any>, ttl: number = this.defaultTTL): Promise<boolean> {
+  async mset(entries: Map<string, unknown>, ttl: number = this.defaultTTL): Promise<boolean> {
     try {
       // Executar em paralelo para melhor performance
       const promises = Array.from(entries.entries()).map(async ([key, value]) => {
         await this.cacheManager.set(key, value, ttl);
       });
-      
+
       await Promise.all(promises);
       return true;
-    } catch (error) {
-      this.logger.error(`Erro ao armazenar múltiplos valores no cache: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(
+        `Erro ao armazenar múltiplos valores no cache: ${err.message}`,
+        err.stack,
+      );
       return false;
     }
   }
-} 
+}
