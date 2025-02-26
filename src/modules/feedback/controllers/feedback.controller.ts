@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { FeedbackService } from '../services/feedback.service';
 import { FeedbackDto } from '../dtos/feedback.dto';
-import { ClerkGuard } from '../../api-gateway/clerk/clerk.guard';
+import { MockAuthGuard } from '../../../common/guards/mock-auth.guard';
 
 @Controller('feedback')
 export class FeedbackController {
@@ -13,7 +13,7 @@ export class FeedbackController {
    * @returns Confirmação de processamento
    */
   @Post()
-  @UseGuards(ClerkGuard)
+  @UseGuards(MockAuthGuard)
   async submitFeedback(@Body() feedback: FeedbackDto) {
     return this.feedbackService.processFeedback(feedback);
   }
@@ -23,7 +23,7 @@ export class FeedbackController {
    * @returns Métricas de feedback
    */
   @Get('analytics')
-  @UseGuards(ClerkGuard)
+  @UseGuards(MockAuthGuard)
   async getAnalytics() {
     return {
       analytics: this.feedbackService.getAnalytics(),

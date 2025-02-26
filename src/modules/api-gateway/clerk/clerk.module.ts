@@ -16,12 +16,25 @@ export class ClerkModule {
         {
           provide: 'CLERK_CONFIG',
           inject: [ConfigService],
-          useFactory: (configService: ConfigService): ClerkConfig => ({
-            secretKey: config?.secretKey || configService.getOrThrow('CLERK_SECRET_KEY'),
-            publishableKey: config?.publishableKey || configService.getOrThrow('CLERK_PUBLISHABLE_KEY'),
-            webhookSecret: config?.webhookSecret || configService.getOrThrow('CLERK_WEBHOOK_SECRET'),
-            jwtKey: config?.jwtKey || configService.getOrThrow('CLERK_JWT_KEY'),
-          }),
+          useFactory: (configService: ConfigService): ClerkConfig => {
+            // Em ambiente de desenvolvimento, use valores mock se as variáveis não estiverem definidas
+            const isDev = configService.get('NODE_ENV') === 'development';
+
+            return {
+              secretKey: config?.secretKey ||
+                configService.get('CLERK_SECRET_KEY') ||
+                (isDev ? 'sk_test_mock_key' : undefined),
+              publishableKey: config?.publishableKey ||
+                configService.get('CLERK_PUBLISHABLE_KEY') ||
+                (isDev ? 'pk_test_mock_key' : undefined),
+              webhookSecret: config?.webhookSecret ||
+                configService.get('CLERK_WEBHOOK_SECRET') ||
+                (isDev ? 'whsec_mock_webhook_secret' : undefined),
+              jwtKey: config?.jwtKey ||
+                configService.get('CLERK_JWT_KEY') ||
+                (isDev ? 'jwt_mock_key' : undefined),
+            };
+          },
         },
         ClerkService,
         ClerkGuard,

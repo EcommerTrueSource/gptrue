@@ -6,7 +6,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { ClerkGuard } from '../clerk/clerk.guard';
+import { MockAuthGuard } from '../../../common/guards/mock-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import {
@@ -83,7 +83,7 @@ export class AdminDataResponse extends ProtectedDataResponse {
 @ApiTags('Administração')
 @Controller('api')
 @ApiBearerAuth('JWT')
-@UseGuards(ClerkGuard, RolesGuard)
+@UseGuards(MockAuthGuard, RolesGuard)
 export class AdminController {
   @Get('health')
   @ApiOperation({

@@ -5,7 +5,7 @@ import {
   ConversationResponseDto,
 } from '../../api-gateway/dtos/conversation.dto';
 
-@Controller('conversation')
+@Controller('internal/conversation')
 export class OrchestratorController {
   constructor(private readonly orchestratorService: OrchestratorService) {}
 

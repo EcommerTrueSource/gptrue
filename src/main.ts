@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import * as winston from 'winston';
 import helmet from 'helmet';
-import * as compression from 'compression';
+import compression from 'compression';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { Logger } from '@nestjs/common';
 import { setupSwagger } from './config/swagger.config';
@@ -57,7 +57,7 @@ async function bootstrap(): Promise<void> {
 
   // Inicialização do servidor
   const port = configService.get<number>('app.port') ?? 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`Aplicação iniciada na porta ${port}`);
   logger.log(`Ambiente: ${configService.get<string>('app.environment') ?? 'development'}`);
   logger.log(`Documentação da API disponível em: http://localhost:${port}/api/docs`);

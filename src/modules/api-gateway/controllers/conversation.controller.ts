@@ -1,5 +1,5 @@
 import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
-import { ClerkGuard } from '../clerk/clerk.guard';
+import { MockAuthGuard } from '../../../common/guards/mock-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { OrchestratorService } from '../../orchestrator/services/orchestrator.service';
@@ -10,7 +10,7 @@ export class ConversationDto {
 }
 
 @Controller('conversation')
-@UseGuards(ClerkGuard, RolesGuard)
+@UseGuards(MockAuthGuard, RolesGuard)
 export class ConversationController {
   constructor(private readonly orchestratorService: OrchestratorService) {}
 
