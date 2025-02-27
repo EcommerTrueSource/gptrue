@@ -44,11 +44,14 @@ export class QueryValidatorService {
     'GRANT',
     'REVOKE',
   ] as const;
+  private readonly maxQueryCost: number;
+  private readonly maxExecutionTime: number;
+  private readonly allowedTables: string[];
 
   constructor(
     private readonly configService: ConfigService,
     @Inject(BIGQUERY_SERVICE)
-    private readonly bigQueryService: IBigQueryService,
+    private readonly bigQueryService: IBigQueryService
   ) {
     this.bigquery = new BigQuery({
       projectId: this.configService.get<string>('bigquery.projectId'),
@@ -74,58 +77,114 @@ export class QueryValidatorService {
    * @param query Consulta SQL a ser validada
    * @returns Resultado da validação
    */
-  public async validateQuery(query: string): Promise<ValidationResult> {
+  public async validateQuery(query: string): Promise<QueryValidationResult> {
+    if (!query?.trim()) {
+      return {
+        isValid: false,
+        errors: [{
+          code: 'EMPTY_QUERY',
+          message: 'Query não pode estar vazia',
+          severity: 'error'
+        }]
+      };
+    }
+
     try {
-      const syntaxResult = await this.validateSyntax(query);
-      if (!syntaxResult.isValid) {
-        return syntaxResult;
-      }
-
-      const securityResult = await this.validateSecurity(query);
-      if (!securityResult.isValid) {
-        return securityResult;
-      }
-
-      // Validar a query usando o BigQuery
-      const isValid = await this.bigQueryService.validateQuery(query);
-      if (!isValid) {
+      // Verificar se contém operações não permitidas
+      if (this.containsDisallowedCommands(query)) {
         return {
           isValid: false,
           errors: [{
-            code: 'INVALID_QUERY',
-            message: 'A query é inválida segundo o BigQuery',
-            severity: 'error',
-          }],
+            code: 'INVALID_OPERATION',
+            message: 'Operações de modificação não são permitidas',
+            severity: 'error'
+          }]
         };
       }
 
-      // Estimar o custo
-      const estimatedCost = await this.bigQueryService.estimateCost(query);
+      // Verificar sintaxe básica
+      if (!query.trim().toUpperCase().startsWith('SELECT')) {
+        return {
+          isValid: false,
+          errors: [{
+            code: 'SYNTAX_ERROR',
+            message: 'A query deve começar com SELECT',
+            severity: 'error'
+          }]
+        };
+      }
 
+      // Verificar tabelas permitidas
+      const tables = this.extractTableNames(query);
+      const unauthorizedTables = tables.filter(
+        table => !this.securityPolicy.allowedTables.includes(table)
+      );
+
+      if (unauthorizedTables.length > 0) {
+        return {
+          isValid: false,
+          errors: [{
+            code: 'UNAUTHORIZED_TABLE',
+            message: `Acesso não autorizado às tabelas: ${unauthorizedTables.join(', ')}`,
+            severity: 'error'
+          }]
+        };
+      }
+
+      // Verificar limites de recursos
+      const estimatedCost = await this.estimateQueryCost(query);
+      if (estimatedCost.processingBytes > this.MAX_BYTES_ALLOWED) {
+        return {
+          isValid: false,
+          errors: [{
+            code: 'RESOURCE_LIMIT',
+            message: `A query excede o limite de processamento de dados (${this.MAX_BYTES_ALLOWED} bytes)`,
+            severity: 'error'
+          }],
+          estimatedCost
+        };
+      }
+
+      // Se passou por todas as validações
       return {
         isValid: true,
-        estimatedCost: {
-          processingBytes: estimatedCost,
-          processingTime: new Date().toISOString(),
-          estimatedCost: this.calculateEstimatedCost(estimatedCost),
-          affectedRows: 0,
-        },
+        warnings: [],
+        estimatedCost
       };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido na validação da query';
-      this.logger.error({
-        message: 'Erro ao validar query',
-        error: errorMessage,
-        query,
-      });
-
+    } catch (error: any) {
+      this.logger.error('Erro ao validar query:', error);
       return {
         isValid: false,
         errors: [{
           code: 'VALIDATION_ERROR',
-          message: errorMessage,
-          severity: 'error',
-        }],
+          message: error.message || 'Erro ao validar query',
+          severity: 'error'
+        }]
+      };
+    }
+  }
+
+  /**
+   * Estima o custo de uma consulta
+   * @param query Consulta SQL
+   * @returns Estimativa de custo
+   */
+  public async estimateQueryCost(query: string): Promise<any> {
+    try {
+      const bytesProcessed = await this.bigQueryService.estimateCost(query);
+      return {
+        processingBytes: bytesProcessed,
+        processingTime: '0s',
+        estimatedCost: this.calculateEstimatedCost(bytesProcessed),
+        affectedRows: 0,
+      };
+    } catch (error) {
+      this.logger.error('Erro ao estimar custo da query:', error);
+      return {
+        processingBytes: 0,
+        processingTime: '0s',
+        estimatedCost: 0,
+        affectedRows: 0,
       };
     }
   }

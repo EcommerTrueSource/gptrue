@@ -13,6 +13,11 @@ export interface ResponseContext {
     startTime: number;
     [key: string]: any;
   };
+  config?: {
+    language?: string;
+    format?: string;
+    includeMetadata?: boolean;
+  };
 }
 
 /**

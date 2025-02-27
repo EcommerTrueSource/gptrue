@@ -1,85 +1,69 @@
-export default () => ({
-  app: {
-    port: parseInt(process.env.PORT, 10) || 3000,
+import { registerAs } from '@nestjs/config';
+import * as Joi from 'joi';
+
+// Regex para validação de URLs
+const urlRegex = /^https?:\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?$/;
+
+// Regex para validação de chaves API (padrão comum)
+const apiKeyRegex = /^[a-zA-Z0-9_-]{10,}$/;
+
+// Regex para validação de email
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+// Regex para validação do formato da private key
+const privateKeyRegex = /^-----BEGIN PRIVATE KEY-----[\s\S]*-----END PRIVATE KEY-----$/;
+
+// Regex para validação do email de service account
+const serviceAccountEmailRegex = /^[a-z0-9-]+@[a-z0-9-]+\.iam\.gserviceaccount\.com$/;
+
+// Regex para validação do ID do projeto
+const projectIdRegex = /^[a-z][-a-z0-9]{4,28}[a-z0-9]$/;
+
+// Definindo o schema de validação (apenas para referência, não exportado)
+const validationSchema = Joi.object({
+  // Application settings
+  NODE_ENV: Joi.string()
+    .valid('development', 'production', 'test')
+    .default('development')
+    .description('Ambiente de execução da aplicação'),
+  PORT: Joi.number().default(3000).description('Porta do servidor'),
+  LOG_LEVEL: Joi.string()
+    .valid('error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly')
+    .default('info')
+    .description('Nível de log da aplicação'),
+  FRONTEND_URL: Joi.string()
+    .pattern(urlRegex)
+    .default('http://localhost:3001')
+    .description('URL do frontend'),
+  CORS_ORIGIN: Joi.string()
+    .pattern(urlRegex)
+    .default('http://localhost:3001')
+    .description('Origem permitida para CORS'),
+
+  // BigQuery settings
+  BIGQUERY_ENABLED: Joi.boolean().default(true),
+  BIGQUERY_PROJECT_ID: Joi.string().pattern(projectIdRegex).required(),
+  BIGQUERY_DATASET: Joi.string().required(),
+  BIGQUERY_LOCATION: Joi.string().valid('US', 'EU', 'asia-northeast1').default('US'),
+  BIGQUERY_MAX_BYTES_PROCESSED: Joi.number().min(1000000).max(1000000000000).default(100000000),
+  BIGQUERY_TIMEOUT_MS: Joi.number().min(1000).max(300000).default(30000),
+  GOOGLE_CLOUD_CLIENT_EMAIL: Joi.string().pattern(serviceAccountEmailRegex).required(),
+  GOOGLE_CLOUD_PRIVATE_KEY: Joi.string().pattern(privateKeyRegex).required(),
+
+  // Outras configurações...
+});
+
+export default registerAs('app', () => {
+  // Log da configuração
+  console.log('Loading application configuration...');
+
+  return {
     environment: process.env.NODE_ENV || 'development',
-    logging: {
-      level: process.env.LOG_LEVEL || 'info',
-    },
-    cors: {
-      origin: process.env.CORS_ORIGIN || '*',
-    },
-    metrics: {
-      enabled: process.env.ENABLE_METRICS === 'true',
-      port: parseInt(process.env.METRICS_PORT, 10) || 9090,
-    },
-    timeouts: {
-      request: parseInt(process.env.REQUEST_TIMEOUT, 10) || 30000,
-      query: parseInt(process.env.QUERY_TIMEOUT, 10) || 60000,
-    },
-  },
-  clerk: {
-    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY,
-  },
-  bigquery: {
-    projectId: process.env.BIGQUERY_PROJECT_ID,
-    dataset: process.env.BIGQUERY_DATASET,
-    location: process.env.BIGQUERY_LOCATION || 'US',
-    maxBytesProcessed: parseInt(process.env.BIGQUERY_MAX_BYTES_PROCESSED, 10) || 1000000000,
-    timeoutMs: parseInt(process.env.BIGQUERY_TIMEOUT_MS, 10) || 30000,
-  },
-  pinecone: {
-    apiKey: process.env.PINECONE_API_KEY,
-    environment: process.env.PINECONE_ENVIRONMENT,
-    index: process.env.PINECONE_INDEX,
-    host: process.env.PINECONE_HOST,
-    namespace: process.env.PINECONE_NAMESPACE || 'default',
-    similarityThreshold: parseFloat(process.env.PINECONE_SIMILARITY_THRESHOLD) || 0.85,
-    ttl: {
-      enabled: process.env.PINECONE_TTL_ENABLED === 'true',
-      days: parseInt(process.env.PINECONE_TTL_DAYS, 10) || 30,
-    },
-  },
-  ai: {
-    openai: {
-      apiKey: process.env.OPENAI_API_KEY,
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS, 10) || 2000,
-      temperature: parseFloat(process.env.OPENAI_TEMPERATURE) || 0.7,
-    },
-    vertexAi: {
-      projectId: process.env.VERTEX_AI_PROJECT_ID,
-      location: process.env.VERTEX_AI_LOCATION || 'us-central1',
-      model: process.env.VERTEX_AI_MODEL || 'text-bison@001',
-      maxTokens: parseInt(process.env.VERTEX_AI_MAX_TOKENS, 10) || 1024,
-      temperature: parseFloat(process.env.VERTEX_AI_TEMPERATURE) || 0.2,
-    },
-  },
-  langchain: {
-    verbose: process.env.LANGCHAIN_VERBOSE === 'true',
-    maxRetries: parseInt(process.env.LANGCHAIN_MAX_RETRIES, 10) || 3,
-    timeoutMs: parseInt(process.env.LANGCHAIN_TIMEOUT_MS, 10) || 30000,
-  },
-  rateLimiting: {
-    enabled: process.env.ENABLE_RATE_LIMITING === 'true',
-    points: parseInt(process.env.RATE_LIMIT_POINTS, 10) || 100,
-    duration: parseInt(process.env.RATE_LIMIT_DURATION, 10) || 60,
-  },
-  cache: {
-    ttl: parseInt(process.env.CACHE_TTL, 10) || 3600,
-    maxSize: parseInt(process.env.MAX_CACHE_SIZE, 10) || 1000,
-  },
-  redis: {
-    url: process.env.REDIS_URL,
-    host: process.env.REDIS_HOST,
-    port: parseInt(process.env.REDIS_PORT, 10) || 24927,
-    username: process.env.REDIS_USERNAME || 'default',
-    password: process.env.REDIS_PASSWORD,
-    tls: process.env.REDIS_TLS === 'true',
-  },
-  security: {
-    enableRateLimiting: process.env.ENABLE_RATE_LIMITING === 'true',
-    enableRequestValidation: process.env.ENABLE_REQUEST_VALIDATION === 'true',
-    enableSqlValidation: process.env.ENABLE_SQL_VALIDATION === 'true',
-  },
+    port: parseInt(process.env.PORT, 10) || 3000,
+    logLevel: process.env.LOG_LEVEL || 'info',
+    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',
+    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+
+    // Outras configurações...
+  };
 });

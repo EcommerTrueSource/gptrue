@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPTrue Chat - Interface de Teste</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo-container">
+                <h1>GPTrue Chat</h1>
+                <span class="version">v1.0</span>
+            </div>
+            <div class="header-controls">
+                <button id="clear-chat" class="btn btn-outline">Limpar Chat</button>
+                <div class="connection-status">
+                    <span class="status-indicator" id="status-indicator"></span>
+                    <span id="connection-text">Desconectado</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="chat-container">
+            <div class="messages-container" id="messages-container">
+                <div class="message system-message">
+                    <div class="message-content">
+                        <p>Bem-vindo ao GPTrue Chat! Faça perguntas sobre dados de e-commerce para obter insights
+                            valiosos.</p>
+                        <div class="suggestions">
+                            <p>Sugestões:</p>
+                            <button class="suggestion-btn">Quais foram os 5 produtos mais vendidos no último
+                                mês?</button>
+                            <button class="suggestion-btn">Qual o ticket médio dos pedidos em janeiro?</button>
+                            <button class="suggestion-btn">Como está a taxa de conversão de assinaturas?</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <textarea id="user-input" placeholder="Digite sua pergunta aqui..." rows="1"></textarea>
+                <button id="send-btn" class="btn btn-primary" title="Enviar mensagem">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </main>
+
+        <div class="settings-panel">
+            <h3>Configurações da API</h3>
+            <div class="form-group">
+                <label for="api-url">URL da API:</label>
+                <input type="text" id="api-url" value="http://localhost:3000/conversation" />
+            </div>
+            <div class="form-group">
+                <label for="api-key">API Key (opcional):</label>
+                <input type="text" id="api-key" placeholder="Insira sua API key" />
+            </div>
+            <div class="form-group">
+                <label for="conversation-id">ID da Conversa (opcional):</label>
+                <input type="text" id="conversation-id" placeholder="Deixe em branco para nova conversa" />
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="show-sql" />
+                <label for="show-sql">Mostrar SQL gerado</label>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="debug-mode" />
+                <label for="debug-mode">Modo de depuração</label>
+            </div>
+            <button id="test-connection" class="btn btn-secondary">Testar Conexão</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

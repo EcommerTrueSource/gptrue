@@ -8,6 +8,7 @@ import compression from 'compression';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { Logger } from '@nestjs/common';
 import { setupSwagger } from './config/swagger.config';
+import { SensitiveDataInterceptor } from './common/interceptors/sensitive-data.interceptor';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
@@ -37,6 +38,9 @@ async function bootstrap(): Promise<void> {
 
   // Filtro global de exceções
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Configurar interceptor global
+  app.useGlobalInterceptors(new SensitiveDataInterceptor());
 
   // Configuração de logging
   const winstonLogger = winston.createLogger({

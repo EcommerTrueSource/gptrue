@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { VertexAIService } from '../../../integrations/vertex-ai/vertex-ai.service';
+import { VertexAIService } from './vertex-ai.service';
 import { SQLGenerationError } from '../errors/sql-generation.error';
 import { TableSchemas } from '../constants/table-schemas.constant';
 
@@ -9,11 +9,15 @@ export class QueryGeneratorService {
   private readonly logger = new Logger(QueryGeneratorService.name);
 
   constructor(
-    private readonly vertexAiService: VertexAIService,
+    private readonly vertexAIService: VertexAIService,
     private readonly configService: ConfigService,
   ) {}
 
   async generateSQL(question: string): Promise<string> {
+    if (!question) {
+      throw new Error('Pergunta não pode estar vazia');
+    }
+
     try {
       this.logger.debug('Gerando SQL para a pergunta', { question });
 
@@ -21,7 +25,7 @@ export class QueryGeneratorService {
       const prompt = this.preparePrompt(question);
 
       // 2. Gerar SQL usando Vertex AI
-      const sql = await this.vertexAiService.generateSQL(prompt);
+      const sql = await this.vertexAIService.generateSQL(prompt);
 
       // 3. Validar SQL básico (sintaxe)
       this.validateSQLSyntax(sql);

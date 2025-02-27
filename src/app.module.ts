@@ -11,14 +11,20 @@ import { QueryValidatorModule } from './modules/query-validator/query-validator.
 import { ResponseGeneratorModule } from './modules/response-generator/response-generator.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { BigQueryModule } from './database/bigquery/bigquery.module';
+import { MonitoringModule } from './common/modules/monitoring.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ['.env.local', '.env'],
       load: [configuration],
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: false,
+      },
     }),
+    MonitoringModule,
     ApiGatewayModule,
     OrchestratorModule,
     SemanticCacheModule,

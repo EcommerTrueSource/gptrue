@@ -245,44 +245,114 @@ interface TableSchema {
 
 ## 7. Monitoramento e Observabilidade
 
-### 7.1 Métricas Principais
+### 7.1 Componentes do Sistema de Monitoramento
 
-- Tempo de resposta (completo e por etapa)
-- Taxa de acerto do cache semântico
-- Taxa de sucesso na geração de SQL
-- Satisfação do usuário (baseada em feedback)
-- Consumo de recursos (BigQuery, Vertex AI, OpenAI)
+#### 7.1.1 PrometheusService
+Serviço responsável pela coleta e exposição de métricas do Prometheus, incluindo:
+- Uso de recursos por tipo e serviço
+- Total de requisições da API por endpoint e status
+- Latência das requisições
+- Total de erros por serviço
+- Duração das queries
+- Uso de memória
+- Conexões ativas
 
-### 7.2 Logs Estruturados
+#### 7.1.2 ConfigMonitoringService
+Gerencia a configuração e monitoramento de recursos do sistema:
+- Monitoramento de uso de memória em tempo real
+- Geração de relatórios periódicos (horários)
+- Rastreamento de uso de recursos externos
+- Sistema de alertas para uso crítico
+- Métricas de performance e latência
+
+#### 7.1.3 MonitoringController
+Expõe endpoints REST para acesso às métricas:
+- `/monitoring/metrics` - Métricas do Prometheus
+- `/monitoring/health` - Status de saúde do serviço
+- `/monitoring/usage` - Relatório de uso atual
+
+### 7.2 Métricas Coletadas
 
 ```typescript
 interface LogEntry {
   timestamp: string;
   level: 'info' | 'warn' | 'error' | 'debug';
-  service: string;               // Componente que gerou o log
-  traceId: string;               // ID de rastreamento da requisição
-  userId?: string;               // ID do usuário (se autenticado)
-  message: string;               // Mensagem principal
-  context?: any;                 // Contexto adicional
-  error?: {                      // Detalhes do erro (se aplicável)
+  service: string;
+  traceId: string;
+  userId?: string;
+  message: string;
+  context?: any;
+  error?: {
     message: string;
     stack?: string;
     code?: string;
   };
-  performance?: {                // Métricas de performance
+  performance?: {
     durationMs: number;
     cpuTimeMs?: number;
     memoryUsageMb?: number;
   };
 }
+
+interface UsageReport {
+  timestamp: string;
+  memory: {
+    heapTotal: string;
+    heapUsed: string;
+    rss: string;
+    external: string;
+  };
+  uptime: number;
+  environment: string;
+}
 ```
 
-### 7.3 Alertas
+### 7.3 Configuração do Monitoramento
 
-- Notificações para falhas recorrentes
-- Alertas para aumento significativo no custo das consultas
-- Monitoramento de taxa de feedback negativo
-- Detecção de anomalias no padrão de uso
+```env
+# Prometheus
+PROMETHEUS_ENABLED=true
+PROMETHEUS_PATH=/metrics
+PROMETHEUS_PREFIX=gptrue_
+PROMETHEUS_DEFAULT_METRICS=true
+PROMETHEUS_COLLECT_INTERVAL=10000
+
+# Métricas e Timeouts
+ENABLE_METRICS=true
+METRICS_PORT=9090
+REQUEST_TIMEOUT=30000
+QUERY_TIMEOUT=60000
+MAX_CONCURRENT_QUERIES=10
+
+# Limites de Recursos
+BIGQUERY_MAX_BYTES_PROCESSED=1000000000
+OPENAI_MAX_TOKENS=2000
+VERTEX_AI_MAX_TOKENS=1024
+REDIS_MAX_ITEMS=100
+REDIS_MAX_MEMORY_MB=512
+RATE_LIMIT_POINTS=100
+RATE_LIMIT_DURATION=60
+```
+
+### 7.4 Sistema de Alertas
+
+O sistema implementa alertas automáticos para:
+
+1. **Uso de Memória**
+   - Alertas para uso de heap > 80%
+   - Monitoramento contínuo a cada 30 segundos
+
+2. **Recursos Externos**
+   - Alertas para uso > 80% dos limites configurados
+   - Alertas críticos para uso > 95%
+   - Monitoramento de APIs externas (OpenAI, Vertex AI)
+
+3. **Performance**
+   - Latência de requisições
+   - Tempo de execução de queries
+   - Uso de recursos do sistema
+
+Para mais detalhes sobre o sistema de monitoramento, consulte [MONITORING.md](MONITORING.md).
 
 ## 8. Escalabilidade e Performance
 

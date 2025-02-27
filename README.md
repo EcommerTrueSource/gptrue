@@ -23,6 +23,7 @@
   - [Configuração](#configuração)
 - [Uso](#uso)
 - [API](#api)
+- [Monitoramento](#monitoramento)
 - [Testes](#testes)
 - [Deploy](#deploy)
 - [FAQ](#faq)
@@ -63,6 +64,8 @@ O GPTrue é um chatbot generativo integrado ao "Painel True", desenvolvido para 
 - [Upstash Redis](https://upstash.com/) - Cache distribuído
 - [Clerk](https://clerk.com/) - Autenticação
 - [GitHub Actions](https://github.com/features/actions) - CI/CD
+- [Prometheus](https://prometheus.io/) - Monitoramento de métricas
+- [Grafana](https://grafana.com/) - Visualização de métricas
 
 ## 🏗 Arquitetura
 
@@ -182,6 +185,35 @@ npm run build
 \`\`\`bash
 docker-compose -f docker-compose.prod.yml up -d
 \`\`\`
+
+## 📊 Monitoramento
+
+O GPTrue possui um sistema robusto de monitoramento baseado em Prometheus que coleta métricas importantes sobre o funcionamento da aplicação:
+
+### Métricas Principais
+- **Recursos**: Uso de memória, CPU e rede
+- **API**: Latência, taxa de requisições e erros
+- **Queries**: Performance e custos de execução
+- **Serviços Externos**: Uso de OpenAI, Vertex AI e BigQuery
+- **Cache**: Taxa de hit/miss e performance
+
+### Componentes
+- **PrometheusService**: Coleta e exposição de métricas
+- **ConfigMonitoringService**: Gerenciamento de recursos e alertas
+- **MonitoringController**: Endpoints REST para métricas
+
+### Endpoints
+- `/monitoring/metrics` - Métricas do Prometheus
+- `/monitoring/health` - Status de saúde do serviço
+- `/monitoring/usage` - Relatório de uso atual
+
+### Alertas Automáticos
+- Uso crítico de memória (>80% heap)
+- Limites de recursos externos (>80% e >95%)
+- Performance e latência anormal
+- Erros recorrentes em serviços
+
+Para mais detalhes sobre o sistema de monitoramento, consulte [MONITORING.md](MONITORING.md).
 
 ## ❓ FAQ
 

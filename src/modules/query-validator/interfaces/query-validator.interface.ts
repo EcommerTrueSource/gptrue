@@ -3,17 +3,18 @@ import { GeneratedQuery } from '../../query-generator/interfaces/query-generator
 export interface ValidationResult {
   isValid: boolean;
   errors?: ValidationError[];
-  warnings?: ValidationWarning[];
-  estimatedCost?: QueryCostEstimate;
+  warnings?: ValidationError[];
+  estimatedCost?: {
+    bytesProcessed: number;
+    estimatedExecutionTimeMs: number;
+  };
   optimizations?: QueryOptimization[];
 }
 
 export interface ValidationError {
   code: string;
   message: string;
-  line?: number;
-  column?: number;
-  severity: 'error';
+  severity: 'error' | 'warning';
 }
 
 export interface ValidationWarning {
@@ -73,17 +74,9 @@ export interface SecurityPolicy {
 
 export interface QueryValidationResult {
   isValid: boolean;
-  query: string;
-  message: string;
-  fields?: Array<{
-    name: string;
-    type: string;
-    mode: string;
-    description?: string;
-  }>;
-  statistics?: {
-    totalBytesProcessed: number;
-  };
+  errors?: ValidationError[];
+  warnings?: ValidationError[];
+  estimatedCost?: QueryCostEstimate;
 }
 
 export interface QueryField {
