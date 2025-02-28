@@ -25,7 +25,7 @@ export class HealthController {
     try {
       // Testa uma query simples
       const query = 'SELECT 1 as test';
-      const result = await this.bigQueryService.query(query);
+      const result = await this.bigQueryService.executeQuery(query);
       return { status: 'ok', message: 'Conexão com BigQuery estabelecida', result };
     } catch (error) {
       this.logger.error('Erro ao testar conexão com BigQuery', error);

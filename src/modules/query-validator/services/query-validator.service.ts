@@ -1,6 +1,8 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BigQuery } from '@google-cloud/bigquery';
+import * as fs from 'fs';
+import * as path from 'path';
 import { GeneratedQuery } from '../../query-generator/interfaces/query-generator.interface';
 import {
   ValidationResult,
@@ -16,7 +18,7 @@ import { DEFAULT_SECURITY_POLICY } from '../constants/security-policies';
 import { IBigQueryService, BIGQUERY_SERVICE } from '../../../database/bigquery/interfaces/bigquery.interface';
 
 @Injectable()
-export class QueryValidatorService {
+export class QueryValidatorService implements OnModuleInit {
   private readonly logger = new Logger(QueryValidatorService.name);
   private readonly bigquery: BigQuery;
   private readonly securityPolicy: SecurityPolicy;
@@ -47,6 +49,7 @@ export class QueryValidatorService {
   private readonly maxQueryCost: number;
   private readonly maxExecutionTime: number;
   private readonly allowedTables: string[];
+  private template: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -62,14 +65,32 @@ export class QueryValidatorService {
       allowedOperations: ['SELECT'],
       maxBytesProcessed: 1000000000, // 1GB
       maxRows: 10000,
-      allowedTables: ['PEDIDOS', 'PRODUTOS', 'ASSINATURA', 'CLIENTES', 'STATUS_CLIENTES', 'STATUS_ASSINANTES'],
+      allowedTables: [
+        'pedidos', 'produtos', 'assinaturas', 'clientes', 'status_clientes', 'status_assinantes'
+      ],
       restrictedColumns: [
         {
-          table: 'CLIENTES',
+          table: 'clientes',
           columns: ['clientProfileData_document', 'clientProfileData_phone'],
         },
       ],
     };
+
+    this.logger.log('Serviço de validação de consultas SQL inicializado');
+  }
+
+  onModuleInit() {
+    try {
+      // Usar o template do diretório raiz do projeto
+      const templatePath = path.join(process.cwd(), 'templates', 'files', 'query-validator.template.txt');
+      this.template = fs.readFileSync(templatePath, 'utf8');
+      this.logger.log(`Template de validação de consultas carregado com sucesso: ${templatePath}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorStack = error instanceof Error ? error.stack : '';
+      this.logger.error(`Erro ao carregar o template de validação de consultas: ${errorMessage}`, errorStack);
+      throw error;
+    }
   }
 
   /**
@@ -78,6 +99,8 @@ export class QueryValidatorService {
    * @returns Resultado da validação
    */
   public async validateQuery(query: string): Promise<QueryValidationResult> {
+    this.logger.debug(`Validando consulta SQL: ${query.substring(0, 100)}...`);
+
     if (!query?.trim()) {
       return {
         isValid: false,
@@ -92,6 +115,7 @@ export class QueryValidatorService {
     try {
       // Verificar se contém operações não permitidas
       if (this.containsDisallowedCommands(query)) {
+        this.logger.warn(`Consulta contém comandos não permitidos: ${query.substring(0, 100)}...`);
         return {
           isValid: false,
           errors: [{
@@ -104,6 +128,7 @@ export class QueryValidatorService {
 
       // Verificar sintaxe básica
       if (!query.trim().toUpperCase().startsWith('SELECT')) {
+        this.logger.warn(`Consulta não começa com SELECT: ${query.substring(0, 100)}...`);
         return {
           isValid: false,
           errors: [{
@@ -116,11 +141,14 @@ export class QueryValidatorService {
 
       // Verificar tabelas permitidas
       const tables = this.extractTableNames(query);
+      this.logger.debug(`Tabelas encontradas na consulta: ${tables.join(', ')}`);
+
       const unauthorizedTables = tables.filter(
         table => !this.securityPolicy.allowedTables.includes(table)
       );
 
       if (unauthorizedTables.length > 0) {
+        this.logger.warn(`Consulta contém tabelas não autorizadas: ${unauthorizedTables.join(', ')}`);
         return {
           isValid: false,
           errors: [{
@@ -133,7 +161,10 @@ export class QueryValidatorService {
 
       // Verificar limites de recursos
       const estimatedCost = await this.estimateQueryCost(query);
+      this.logger.debug(`Custo estimado da consulta: ${estimatedCost.processingBytes} bytes`);
+
       if (estimatedCost.processingBytes > this.MAX_BYTES_ALLOWED) {
+        this.logger.warn(`Consulta excede o limite de processamento: ${estimatedCost.processingBytes} bytes`);
         return {
           isValid: false,
           errors: [{
@@ -146,6 +177,7 @@ export class QueryValidatorService {
       }
 
       // Se passou por todas as validações
+      this.logger.debug('Consulta validada com sucesso');
       return {
         isValid: true,
         warnings: [],

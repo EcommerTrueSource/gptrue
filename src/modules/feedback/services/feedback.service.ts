@@ -1,12 +1,17 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ISemanticCacheService, SEMANTIC_CACHE_SERVICE } from '../../semantic-cache/interfaces/semantic-cache.interface';
 import { FeedbackDto } from '../dtos/feedback.dto';
 import { FeedbackAnalytics } from '../interfaces/feedback.interface';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
-export class FeedbackService {
+export class FeedbackService implements OnModuleInit {
   private readonly logger = new Logger(FeedbackService.name);
+  private template: string;
   private feedbackAnalytics: FeedbackAnalytics = {
     totalFeedback: 0,
     positiveFeedback: 0,
@@ -20,6 +25,28 @@ export class FeedbackService {
     @Inject(SEMANTIC_CACHE_SERVICE)
     private semanticCacheService: ISemanticCacheService,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const templatePath = path.join(
+        process.cwd(),
+        'templates',
+        'files',
+        'feedback.template.txt',
+      );
+      this.template = fs.readFileSync(templatePath, 'utf8');
+      this.logger.log(`Template de feedback carregado com sucesso: ${templatePath}`);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao carregar o template de feedback: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  getTemplate(): string {
+    return this.template;
+  }
 
   /**
    * Processa o feedback do usuário
@@ -49,6 +76,7 @@ export class FeedbackService {
       // Verificar se precisa de revisão
       if (feedback.type === 'negative') {
         this.addToReviewQueue(feedback);
+        this.logger.debug('Feedback negativo registrado para análise posterior');
       }
 
       this.logger.log('Feedback processado com sucesso', {
@@ -83,6 +111,12 @@ export class FeedbackService {
    * @returns Métricas de feedback
    */
   getAnalytics(): FeedbackAnalytics {
+    this.logger.debug('Obtendo métricas de feedback', {
+      total: this.feedbackAnalytics.totalFeedback,
+      positive: this.feedbackAnalytics.positiveFeedback,
+      negative: this.feedbackAnalytics.negativeFeedback,
+    });
+
     return this.feedbackAnalytics;
   }
 
@@ -101,6 +135,8 @@ export class FeedbackService {
     if (feedback.type === 'negative' && !feedback.comment) {
       throw new Error('Comentário obrigatório para feedback negativo');
     }
+
+    this.logger.debug('Feedback validado com sucesso');
   }
 
   /**
@@ -134,6 +170,12 @@ export class FeedbackService {
         this.feedbackAnalytics.feedbackByCategory[feedback.category].negative++;
       }
     }
+
+    this.logger.debug('Métricas de feedback atualizadas', {
+      totalFeedback: this.feedbackAnalytics.totalFeedback,
+      positiveFeedback: this.feedbackAnalytics.positiveFeedback,
+      negativeFeedback: this.feedbackAnalytics.negativeFeedback,
+    });
   }
 
   /**
@@ -167,6 +209,8 @@ export class FeedbackService {
    * @returns Padrões identificados
    */
   identifyNegativeFeedbackPatterns(): { category: string; count: number }[] {
+    this.logger.debug('Analisando padrões em feedbacks negativos');
+
     const categoryCounts: Record<string, number> = {};
 
     // Contar ocorrências por categoria
@@ -176,8 +220,12 @@ export class FeedbackService {
     });
 
     // Converter para array e ordenar
-    return Object.entries(categoryCounts)
+    const patterns = Object.entries(categoryCounts)
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => b.count - a.count);
+
+    this.logger.debug('Padrões identificados', { patterns });
+
+    return patterns;
   }
 }

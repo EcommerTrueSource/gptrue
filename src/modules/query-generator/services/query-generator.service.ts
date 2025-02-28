@@ -1,17 +1,34 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { VertexAIService } from './vertex-ai.service';
+import * as fs from 'fs';
+import * as path from 'path';
+import { VertexAIService } from '../../../integrations/vertex-ai/vertex-ai.service';
 import { SQLGenerationError } from '../errors/sql-generation.error';
 import { TableSchemas } from '../constants/table-schemas.constant';
 
 @Injectable()
-export class QueryGeneratorService {
+export class QueryGeneratorService implements OnModuleInit {
   private readonly logger = new Logger(QueryGeneratorService.name);
+  private template: string;
 
   constructor(
     private readonly vertexAIService: VertexAIService,
     private readonly configService: ConfigService,
   ) {}
+
+  onModuleInit() {
+    try {
+      // Usar o template do diretório raiz do projeto
+      const templatePath = path.join(process.cwd(), 'templates', 'files', 'sql-generator.template.txt');
+      this.template = fs.readFileSync(templatePath, 'utf8');
+      this.logger.log(`Template de geração SQL carregado com sucesso: ${templatePath}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorStack = error instanceof Error ? error.stack : '';
+      this.logger.error(`Erro ao carregar o template de geração SQL: ${errorMessage}`, errorStack);
+      throw error;
+    }
+  }
 
   async generateSQL(question: string): Promise<string> {
     if (!question) {
@@ -25,6 +42,7 @@ export class QueryGeneratorService {
       const prompt = this.preparePrompt(question);
 
       // 2. Gerar SQL usando Vertex AI
+      this.logger.debug('Enviando prompt para o Vertex AI');
       const sql = await this.vertexAIService.generateSQL(prompt);
 
       // 3. Validar SQL básico (sintaxe)
@@ -63,21 +81,26 @@ export class QueryGeneratorService {
     const maxTokens = this.configService.get<number>('vertexai.maxTokens') ?? 1000;
     const temperature = this.configService.get<number>('vertexai.temperature') ?? 0.3;
 
-    return `
-      Dado o seguinte schema de tabelas:
-      ${JSON.stringify(TableSchemas, null, 2)}
+    // Obter o ID do projeto e dataset do BigQuery
+    const projectId = this.configService.get<string>('bigquery.projectId') || 'truebrands-warehouse';
+    const datasetId = this.configService.get<string>('bigquery.dataset') || 'truebrands_warehouse';
 
-      Por favor, gere uma consulta SQL para responder a seguinte pergunta:
+    this.logger.debug('Preparando prompt com template e schema de tabelas');
+
+    // Substituir placeholders no template
+    const formattedTemplate = this.template
+      .replace(/{project_id}/g, projectId)
+      .replace(/{dataset_id}/g, datasetId);
+
+    return `
+      ${formattedTemplate}
+
+      Pergunta do usuário:
       ${question}
 
-      Requisitos:
-      1. Use apenas as tabelas e campos definidos no schema
-      2. Otimize a query para performance
-      3. Evite SELECT *
-      4. Use aliases apropriados para tabelas
-      5. Inclua comentários explicativos quando necessário
-      6. Limite a resposta a ${maxTokens} tokens
-      7. Use temperature ${temperature} para balancear criatividade e precisão
+      Parâmetros adicionais:
+      - Limite de tokens: ${maxTokens}
+      - Temperature: ${temperature}
     `;
   }
 
@@ -85,6 +108,8 @@ export class QueryGeneratorService {
     if (!sql || typeof sql !== 'string') {
       throw new Error('SQL gerado é inválido ou vazio');
     }
+
+    this.logger.debug('Validando sintaxe básica do SQL gerado');
 
     // Validação básica de sintaxe SQL
     const containsSelect = /SELECT/i.test(sql);
@@ -98,13 +123,17 @@ export class QueryGeneratorService {
     const forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER'];
     for (const keyword of forbiddenKeywords) {
       if (new RegExp(`\\b${keyword}\\b`, 'i').test(sql)) {
+        this.logger.warn(`SQL contém palavra-chave proibida: ${keyword}`);
         throw new Error(`SQL contém palavra-chave proibida: ${keyword}`);
       }
     }
 
     // Verificar injeção de comentários maliciosos
     if (/--|\*\/|\/\*|;/g.test(sql)) {
+      this.logger.warn('SQL contém caracteres potencialmente maliciosos');
       throw new Error('SQL contém caracteres potencialmente maliciosos');
     }
+
+    this.logger.debug('Validação de sintaxe SQL concluída com sucesso');
   }
 }

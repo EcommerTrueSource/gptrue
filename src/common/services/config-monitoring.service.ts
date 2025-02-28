@@ -67,19 +67,101 @@ export class ConfigMonitoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private startMemoryMonitoring() {
+    const intervalMs = this.configService.get<number>('app.monitoring.memoryCheckIntervalMs') || 30000;
+    const warningThreshold = this.configService.get<number>('app.monitoring.memoryWarningThresholdPercent') || 80;
+    const criticalThreshold = this.configService.get<number>('app.monitoring.memoryCriticalThresholdPercent') || 90;
+
+    this.logger.log(`Iniciando monitoramento de memória a cada ${intervalMs}ms com limite de alerta em ${warningThreshold}%`);
+
+    // Armazenar snapshots para detectar vazamentos
+    const memorySnapshots: { timestamp: Date; heapUsed: number }[] = [];
+    const MAX_SNAPSHOTS = 20;
+
     this.memoryMonitoringInterval = setInterval(() => {
       const memoryUsage = process.memoryUsage();
 
+      // Registrar métricas no Prometheus
       this.prometheusService.recordMemoryUsage('heapTotal', memoryUsage.heapTotal);
       this.prometheusService.recordMemoryUsage('heapUsed', memoryUsage.heapUsed);
       this.prometheusService.recordMemoryUsage('rss', memoryUsage.rss);
       this.prometheusService.recordMemoryUsage('external', memoryUsage.external);
 
+      // Calcular porcentagem de uso
       const heapUsagePercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100;
-      if (heapUsagePercent > 80) {
-        this.logger.warn(`Alto uso de memória heap: ${heapUsagePercent.toFixed(2)}%`);
+
+      // Adicionar snapshot para análise de tendência
+      memorySnapshots.push({
+        timestamp: new Date(),
+        heapUsed: memoryUsage.heapUsed
+      });
+
+      // Manter apenas os últimos MAX_SNAPSHOTS
+      if (memorySnapshots.length > MAX_SNAPSHOTS) {
+        memorySnapshots.shift();
       }
-    }, 30000);
+
+      // Verificar tendência de crescimento
+      let isGrowing = false;
+      if (memorySnapshots.length >= 5) {
+        const recentSnapshots = memorySnapshots.slice(-5);
+        let growingCount = 0;
+
+        for (let i = 1; i < recentSnapshots.length; i++) {
+          if (recentSnapshots[i].heapUsed > recentSnapshots[i-1].heapUsed) {
+            growingCount++;
+          }
+        }
+
+        isGrowing = growingCount >= 4;
+      }
+
+      // Registrar uso de memória em nível de debug
+      this.logger.debug(`Uso de memória: ${heapUsagePercent.toFixed(2)}% (${this.formatBytes(memoryUsage.heapUsed)}/${this.formatBytes(memoryUsage.heapTotal)})`);
+
+      // Alertar se estiver acima do limite de aviso
+      if (heapUsagePercent > warningThreshold) {
+        this.logger.warn(`Alto uso de memória heap: ${heapUsagePercent.toFixed(2)}% ${isGrowing ? '(CRESCENTE)' : ''}`);
+      }
+
+      // Ações adicionais se estiver acima do limite crítico
+      if (heapUsagePercent > criticalThreshold) {
+        this.logDetailedMemoryInfo(memoryUsage, memorySnapshots);
+
+        // Sugerir coleta de lixo em ambiente de desenvolvimento
+        if (process.env.NODE_ENV === 'development' && global.gc) {
+          this.logger.warn('Forçando coleta de lixo devido ao alto uso de memória');
+          try {
+            global.gc();
+          } catch (error) {
+            this.logger.error('Erro ao forçar coleta de lixo:', error);
+          }
+        }
+      }
+    }, intervalMs);
+  }
+
+  /**
+   * Registra informações detalhadas sobre o uso de memória
+   */
+  private logDetailedMemoryInfo(memoryUsage: NodeJS.MemoryUsage, snapshots: { timestamp: Date; heapUsed: number }[]) {
+    this.logger.warn('Detalhes de uso de memória:', {
+      heapTotal: this.formatBytes(memoryUsage.heapTotal),
+      heapUsed: this.formatBytes(memoryUsage.heapUsed),
+      rss: this.formatBytes(memoryUsage.rss),
+      external: this.formatBytes(memoryUsage.external),
+      arrayBuffers: this.formatBytes(memoryUsage.arrayBuffers || 0),
+    });
+
+    // Registrar tendência de crescimento
+    if (snapshots.length >= 10) {
+      const first = snapshots[0];
+      const last = snapshots[snapshots.length - 1];
+      const growthBytes = last.heapUsed - first.heapUsed;
+      const timeSpanMs = last.timestamp.getTime() - first.timestamp.getTime();
+      const growthRate = (growthBytes / timeSpanMs) * 1000; // bytes por segundo
+
+      this.logger.warn(`Taxa de crescimento de memória: ${this.formatBytes(growthRate)}/segundo`);
+    }
   }
 
   private startReportGeneration() {

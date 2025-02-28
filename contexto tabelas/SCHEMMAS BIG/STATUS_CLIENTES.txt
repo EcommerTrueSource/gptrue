@@ -1,0 +1,22 @@
+/ *STATUS CLIENTES* /
+
+Essa tabela serve para analisar o historico do status do cliente, se está ativos ou inativo.
+Utilizamos a regra de clieste que compraram a =<90 dias, ele é um cliente ACTIVE, > que isso o cliente é INACTIVE
+
+1. email (E-mail)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Endereço de e-mail do cliente.
+		Exemplo: "cliente@email.com"
+
+2. status (Status)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Status atual do cliente no sistema, como ativo, inativo, ou pendente.
+		Exemplo: "Ativo"
+
+3. data_atualizacao_warehouse (Data de Atualização no Warehouse)
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data e hora da última atualização do status do cliente no warehouse.
+		Exemplo: "2025-01-15 10:00:00"

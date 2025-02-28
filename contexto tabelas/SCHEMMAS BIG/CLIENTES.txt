@@ -1,0 +1,127 @@
+/ *CLIENTES* /
+
+01. clientProfileData_id (ID do Perfil do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador único do perfil do cliente na plataforma de origem.
+		Exemplo: "12345abcde"
+
+02. id_tiny (ID no Tiny)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador único do cliente no sistema Tiny ERP.
+		Exemplo: "TINY12345"
+
+03. clientProfileData_email (E-mail do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Endereço de e-mail do cliente.
+		Exemplo: "cliente@email.com"
+
+04. clientProfileData_firstName (Primeiro Nome do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Primeiro nome do cliente.
+		Exemplo: "João"
+
+05. clientProfileData_lastName (Sobrenome do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Sobrenome do cliente.
+		Exemplo: "Silva"
+
+06. clientProfileData_documentType (Tipo de Documento do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Tipo de documento do cliente (CPF ou CNPJ).
+		Exemplo: "CPF"
+
+07. clientProfileData_document (Documento do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Número do documento do cliente (CPF ou CNPJ).
+		Exemplo: "12345678901"
+
+08. clientProfileData_phone (Telefone do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Número de telefone do cliente.
+		Exemplo: "(11) 91234-5678"
+
+09. clientProfileData_userProfileId (ID do Perfil do Usuário)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador do perfil do cliente no sistema do usuário.
+		Exemplo: "user123"
+
+10. clientProfileData_customerClass (Classe do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Classe do cliente, como tipo de segmento ou categoria.
+		Exemplo: "Premium"
+
+11. clientProfileData_customerCode (Código do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Código único associado ao cliente no sistema.
+		Exemplo: "CUST001"
+
+12. data_criacao (Data de Criação)
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data e hora de criação do registro do cliente.
+		Exemplo: "2025-01-01 12:00:00"
+
+13. tipo_pessoa (Tipo de Pessoa)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Tipo de pessoa do cliente (física ou jurídica).
+		Exemplo: "Física"
+
+14. cpf_cnpj (CPF ou CNPJ)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: CPF ou CNPJ do cliente.
+		Exemplo: "12345678901"
+
+15. bairro (Bairro)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Bairro do endereço do cliente.
+		Exemplo: "Centro"
+
+16. cep (CEP)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Código Postal (CEP) do cliente.
+		Exemplo: "01000-000"
+
+17. cidade (Cidade)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Cidade de residência do cliente.
+		Exemplo: "São Paulo"
+
+18. uf (Estado)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Unidade Federativa (estado) do endereço do cliente.
+		Exemplo: "SP"
+
+19. status_cliente (Status do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Status do cliente no sistema (ex: ativo, inativo).
+		Exemplo: "Ativo"
+
+20. status_assinante (Status do Assinante)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Indica o status de assinante do cliente (ex: assinante, não-assinante).
+		Exemplo: "Assinante"
+
+21. data_atualizacao_warehouse (Data de Atualização no Warehouse)
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data e hora da última atualização do registro no warehouse.
+		Exemplo: "2025-01-15 10:00:00"

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { BigQueryService } from './bigquery.service';
+import { BigQueryService } from './services/bigquery.service';
 import { BIGQUERY_SERVICE } from './interfaces/bigquery.interface';
 
 @Module({
@@ -8,9 +8,10 @@ import { BIGQUERY_SERVICE } from './interfaces/bigquery.interface';
   providers: [
     {
       provide: BIGQUERY_SERVICE,
-      useClass: BigQueryService
-    }
+      useClass: BigQueryService,
+    },
+    BigQueryService,
   ],
-  exports: [BIGQUERY_SERVICE],
+  exports: [BIGQUERY_SERVICE, BigQueryService],
 })
 export class BigQueryModule {}

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { QueryGeneratorService } from '../../src/modules/query-generator/services/query-generator.service';
-import { VertexAIService } from '../../src/modules/query-generator/services/vertex-ai.service';
+import { VertexAIService } from '../../src/integrations/vertex-ai/vertex-ai.service';
 
 describe('QueryGeneratorService', () => {
   let service: QueryGeneratorService;

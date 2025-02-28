@@ -1,6 +1,8 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   ConversationRequestDto,
   ConversationResponseDto,
@@ -36,9 +38,10 @@ import { ResponseGeneratorService } from '../../response-generator/services/resp
 import { ProcessingError } from '../errors/processing.error';
 
 @Injectable()
-export class OrchestratorService implements IOrchestratorService {
+export class OrchestratorService implements IOrchestratorService, OnModuleInit {
   private readonly logger = new Logger(OrchestratorService.name);
   private readonly conversations = new Map<string, ConversationState>();
+  private template: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -52,6 +55,19 @@ export class OrchestratorService implements IOrchestratorService {
     private readonly bigQueryService: IBigQueryService,
   ) {}
 
+  onModuleInit() {
+    try {
+      const templatePath = path.join(process.cwd(), 'templates', 'files', 'orchestrator.template.txt');
+      this.template = fs.readFileSync(templatePath, 'utf8');
+      this.logger.log(`Template de orquestração carregado com sucesso: ${templatePath}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorStack = error instanceof Error ? error.stack : '';
+      this.logger.error(`Erro ao carregar o template de orquestração: ${errorMessage}`, errorStack);
+      throw error;
+    }
+  }
+
   async processConversation(request: ConversationRequestDto): Promise<ConversationResponseDto> {
     const startTime = Date.now();
     let conversationId = request.conversationId;
@@ -60,20 +76,30 @@ export class OrchestratorService implements IOrchestratorService {
     try {
       // Inicializar ou recuperar conversa
       if (conversationId && this.conversations.has(conversationId)) {
-        conversation = this.conversations.get(conversationId);
+        const existingConversation = this.conversations.get(conversationId);
+        if (existingConversation) {
+          conversation = existingConversation;
+        } else {
+          conversationId = uuidv4();
+          conversation = this.initializeConversation(conversationId, request);
+        }
       } else {
         conversationId = uuidv4();
         conversation = this.initializeConversation(conversationId, request);
       }
+
+      this.logger.debug(`Analisando pergunta: "${request.message}" para determinar rota de processamento`);
 
       // Verificar cache semântico
       const cacheResult = await this.semanticCacheService.findSimilarQuestion(request.message);
 
       let result: ProcessingResult;
       if (cacheResult && cacheResult.confidence >= 0.85) {
-        this.logger.debug(`Cache hit para a pergunta: ${request.message}`);
+        this.logger.debug(`Cache hit para a pergunta: "${request.message}" com confiança ${cacheResult.confidence.toFixed(2)}`);
         result = cacheResult;
       } else {
+        this.logger.debug(`Cache miss para a pergunta: "${request.message}", gerando SQL dinâmico`);
+
         // Gerar SQL
         const sqlQuery = await this.queryGeneratorService.generateSQL(request.message);
 
@@ -109,10 +135,14 @@ export class OrchestratorService implements IOrchestratorService {
 
         // Armazenar no cache
         await this.semanticCacheService.storeResult(request.message, result);
+        this.logger.debug(`Resultado armazenado no cache para uso futuro`);
       }
 
       // Atualizar estado da conversa
       this.updateConversationState(conversation, request.message, result);
+
+      const processingTime = Date.now() - startTime;
+      this.logger.debug(`Processamento concluído em ${processingTime}ms`);
 
       return this.createResponse(conversationId, result);
     } catch (error: unknown) {

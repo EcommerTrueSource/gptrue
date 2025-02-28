@@ -1,0 +1,220 @@
+TEMPLATE DE VALIDAÇÃO DE CONSULTAS SQL PARA O GPTRUE
+
+Este template define as regras e critérios para validação de consultas SQL geradas pelo chatbot GPTrue.
+A validação garante que as consultas atendam aos requisitos de segurança, performance e qualidade.
+
+REGRAS DE VALIDAÇÃO:
+
+1. SEGURANÇA:
+   - Proibir operações de modificação (INSERT, UPDATE, DELETE, DROP, CREATE, ALTER)
+   - Verificar acesso apenas a tabelas autorizadas
+   - Proibir uso de funções potencialmente perigosas
+   - Verificar mascaramento adequado de dados sensíveis
+   - Proibir uso de comandos administrativos
+
+2. PERFORMANCE:
+   - Evitar varreduras completas de tabelas grandes sem filtros
+   - Limitar número de joins e subqueries
+   - Verificar uso adequado de índices e partições
+   - Estimar volume de dados processados
+   - Evitar funções custosas em grandes conjuntos de dados
+
+3. QUALIDADE:
+   - Verificar sintaxe SQL válida
+   - Garantir aliases claros para tabelas e colunas
+   - Verificar formatação adequada
+   - Garantir tratamento adequado de valores nulos
+   - Verificar uso correto de tipos de dados
+
+4. LIMITES:
+   - Máximo de 5 joins por consulta
+   - Máximo de 3 níveis de subqueries
+   - Máximo de 20 colunas no resultado
+   - Máximo de 1GB de dados processados
+   - Timeout máximo de 30 segundos
+
+5. OTIMIZAÇÕES RECOMENDADAS:
+   - Usar particionamento quando disponível
+   - Aplicar filtros em colunas particionadas
+   - Selecionar apenas colunas necessárias
+   - Usar CTEs para melhorar legibilidade
+   - Adicionar LIMIT para consultas diretas
+
+PROCESSO DE VALIDAÇÃO:
+
+1. ANÁLISE SINTÁTICA:
+   - Verificar se a sintaxe SQL é válida
+   - Identificar erros de sintaxe
+   - Verificar existência das tabelas e colunas referenciadas
+   - Verificar compatibilidade de tipos em operações
+   - Identificar problemas de formatação
+
+2. ANÁLISE SEMÂNTICA:
+   - Verificar se a consulta atende à pergunta pretendida
+   - Identificar problemas lógicos
+   - Verificar joins corretos entre tabelas
+   - Verificar filtros apropriados
+   - Verificar agregações corretas
+
+3. ANÁLISE DE SEGURANÇA:
+   - Verificar operações proibidas
+   - Verificar acesso a tabelas não autorizadas
+   - Verificar exposição de dados sensíveis
+   - Verificar injeção de SQL
+   - Verificar uso de funções perigosas
+
+4. ANÁLISE DE PERFORMANCE:
+   - Estimar volume de dados
+   - Identificar gargalos de performance
+   - Verificar uso de índices e partições
+   - Identificar operações custosas
+   - Sugerir otimizações
+
+5. VALIDAÇÃO FINAL:
+   - Aprovar ou rejeitar a consulta
+   - Fornecer justificativa detalhada
+   - Sugerir alternativas se rejeitada
+   - Fornecer métricas estimadas
+   - Classificar a consulta quanto à qualidade
+
+FORMATO DO RESULTADO DA VALIDAÇÃO:
+
+```
+RESULTADO DA VALIDAÇÃO:
+
+Status: [Aprovada | Aprovada com Ressalvas | Rejeitada]
+
+Análise:
+- Sintaxe: [Válida | Inválida]
+- Semântica: [Adequada | Inadequada]
+- Segurança: [Segura | Insegura]
+- Performance: [Boa | Regular | Ruim]
+
+Problemas Identificados:
+- [Severidade]: [Descrição do problema]
+- ...
+
+Recomendações:
+- [Recomendação para correção]
+- ...
+
+Métricas:
+- Estimativa de bytes processados: [valor]
+- Estimativa de tempo de execução: [valor]
+- Complexidade: [1-10]/10
+```
+
+EXEMPLOS DE RESULTADOS DE VALIDAÇÃO:
+
+Exemplo 1 (Consulta Aprovada):
+```
+RESULTADO DA VALIDAÇÃO:
+
+Status: Aprovada
+
+Análise:
+- Sintaxe: Válida
+- Semântica: Adequada
+- Segurança: Segura
+- Performance: Boa
+
+Problemas Identificados:
+- BAIXO: Sem LIMIT explícito
+- BAIXO: Aliases poderiam ser mais descritivos
+
+Recomendações:
+- Adicionar LIMIT para respostas mais rápidas
+- Usar aliases mais descritivos para colunas
+
+Métricas:
+- Estimativa de bytes processados: 200MB
+- Estimativa de tempo de execução: 3 segundos
+- Complexidade: 3/10
+```
+
+Exemplo 2 (Consulta Rejeitada):
+```
+RESULTADO DA VALIDAÇÃO:
+
+Status: Rejeitada
+
+Análise:
+- Sintaxe: Válida
+- Semântica: Adequada
+- Segurança: Insegura
+- Performance: Ruim
+
+Problemas Identificados:
+- CRÍTICO: Uso de DELETE (operação de modificação proibida)
+- ALTO: Sem filtros em tabela grande (pedidos)
+- MÉDIO: Uso excessivo de funções de agregação aninhadas
+
+Recomendações:
+- Remover operação DELETE e substituir por SELECT para visualização
+- Adicionar filtros de data para limitar o volume de dados
+- Simplificar as funções de agregação
+
+Consulta Alternativa Sugerida:
+```sql
+SELECT
+  id_order_tiny,
+  data_pedido,
+  situacao
+FROM pedidos
+WHERE data_pedido >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+LIMIT 1000;
+```
+
+Métricas:
+- Estimativa de bytes processados: 5GB (excede limite)
+- Estimativa de tempo de execução: >60 segundos (excede timeout)
+- Complexidade: 8/10
+```
+
+TABELAS AUTORIZADAS:
+
+1. pedidos
+2. produtos
+3. assinatura
+4. clientes
+5. status_clientes
+6. status_assinantes
+
+CAMPOS SENSÍVEIS (REQUEREM MASCARAMENTO):
+
+1. CLIENTES.clientProfileData_document (CPF/CNPJ)
+   - Formato de mascaramento: "XXX.XXX.XXX-XX" (últimos 4 dígitos visíveis)
+2. CLIENTES.clientProfileData_phone (Telefone)
+   - Formato de mascaramento: "(XX) XXXXX-XXXX" (últimos 4 dígitos visíveis)
+3. PEDIDOS.cliente_json (Dados completos do cliente)
+   - Acesso restrito, usar funções específicas para extrair dados não sensíveis
+
+FUNÇÕES DE MASCARAMENTO APROVADAS:
+
+1. MASK_CPF(document)
+2. MASK_PHONE(phone)
+3. EXTRACT_SAFE_CUSTOMER_DATA(cliente_json)
+
+REGRAS ADICIONAIS:
+
+1. Sempre prefira consultas parametrizadas
+2. Use comentários para explicar a lógica da consulta
+3. Formate a consulta para facilitar a leitura
+4. Evite dependências circulares
+5. Trate valores nulos adequadamente
+6. Use funções de data/hora consistentes
+7. Prefira funções nativas do BigQuery a expressões personalizadas
+8. Evite conversões de tipo desnecessárias
+9. Use aliases descritivos para tabelas e colunas
+10. Mantenha a consulta o mais simples possível para o objetivo
+
+PROIBIÇÕES ABSOLUTAS:
+
+1. NUNCA permita operações de modificação (INSERT, UPDATE, DELETE, DROP, CREATE, ALTER)
+2. NUNCA permita acesso a tabelas não autorizadas
+3. NUNCA permita uso de funções potencialmente perigosas
+4. NUNCA permita consultas que possam expor dados sensíveis não mascarados
+5. NUNCA permita uso de comandos administrativos
+6. NUNCA permita uso de UDFs não autorizadas
+7. NUNCA permita consultas que excedam os limites de recursos
+8. NUNCA permita consultas que possam causar loops infinitos ou recursão excessiva

@@ -24,4 +24,11 @@ export default registerAs('app', () => ({
     ttl: parseInt(process.env.REDIS_TTL ?? '3600', 10) || 3600,
     max: parseInt(process.env.REDIS_MAX_ITEMS ?? '100', 10) || 100,
   },
+  monitoring: {
+    memoryCheckIntervalMs: parseInt(process.env.MEMORY_CHECK_INTERVAL_MS ?? '30000', 10),
+    memoryWarningThresholdPercent: parseInt(process.env.MEMORY_WARNING_THRESHOLD_PERCENT ?? '80', 10),
+    memoryCriticalThresholdPercent: parseInt(process.env.MEMORY_CRITICAL_THRESHOLD_PERCENT ?? '90', 10),
+    enableDetailedMemoryLogging: process.env.ENABLE_DETAILED_MEMORY_LOGGING === 'true',
+    maxMemorySnapshots: parseInt(process.env.MAX_MEMORY_SNAPSHOTS ?? '20', 10),
+  },
 }));

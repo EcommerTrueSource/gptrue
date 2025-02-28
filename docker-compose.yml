@@ -5,31 +5,34 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: gptrue-api
+    restart: unless-stopped
     ports:
-      - '3000:3000'
+      - "3000:3000"
     volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
-    environment:
-      - NODE_ENV=development
+      - ./:/app
+      - /app/node_modules
     env_file:
       - .env
-    command: npm run start:dev
+    depends_on:
+      - redis
     networks:
       - gptrue-network
 
   redis:
-    image: redis:7-alpine
+    image: redis:alpine
+    container_name: gptrue-redis
+    restart: unless-stopped
     ports:
-      - '6379:6379'
+      - "6379:6379"
     volumes:
       - redis-data:/data
     networks:
       - gptrue-network
 
-volumes:
-  redis-data:
-
 networks:
   gptrue-network:
     driver: bridge
+
+volumes:
+  redis-data:

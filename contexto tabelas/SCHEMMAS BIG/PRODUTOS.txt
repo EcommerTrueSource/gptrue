@@ -1,0 +1,193 @@
+/* TABELA PRODUTOS */
+
+01. id
+	Descrição: Identificador único (ID) do SKU na plataforma de e-commerce Vtex .
+	Exemplo:
+		Valor: prod_001
+		Explicação: Representa o produto específico com este código único, como "Camiseta Branca P".
+
+02. ProductId
+	Descrição: Identificador único (ID) do produto na plataforma de e-commerce Vtex.
+	Exemplo:
+		Valor: PRD12345
+		Explicação: Um código específico usado pelo sistema para diferenciar produtos.
+
+03. NameComplete
+	Descrição: Nome completo do produto.
+	Exemplo:
+		Valor: Camiseta Branca Tamanho P
+		Explicação: Nome descritivo que ajuda a identificar o produto.
+
+04. ProductDescription
+	Descrição: Descrição detalhada do produto.
+	Exemplo:
+		Valor: Camiseta de algodão 100%, ideal para uso casual.
+		Explicação: Fornece informações adicionais que ajudam o cliente a entender o produto.
+
+05. ProductRefId
+	Descrição: Código de referência adicional para o produto na Vtex e no ERP Tiny, esse código de referência equivale o SKU do produto, ou seja é utilizado como SKU.
+	Exemplo:
+		Valor: 1234-ABC
+		Explicação: Pode ser usado para integração com outros sistemas ou fornecedores.
+
+06. SkuName
+	Descrição: Em muito os casos o "SkuName" é o mesmo do "NameComplete" porem ocorre casos que são informações divergentes.
+	Exemplo:
+		Valor: Camiseta Branca Tamanho P True Source
+		Explicação: Identifica variações específicas do produto, como cor ou tamanho.
+
+07. TaxCode
+	Descrição: Código fiscal usado para calcular impostos sobre o produto.
+	Exemplo:
+		Valor: ICMS18
+		Explicação: Representa a alíquota de 18% aplicada ao produto.
+
+08. IsActive
+	Descrição: Indica se o produto está ativo no sistema.
+	Exemplo:
+		Valor: TRUE / FALSE / NULL
+		Explicação: O produto está ativo e pode ser vendido. Se fosse false, estaria inativo.
+
+09. IsTransported
+	Descrição: Indica se o produto pode ser transportado.
+	Exemplo:
+		Valor: TRUE / FALSE / NULL
+		Explicação: O produto pode ser enviado para o cliente.
+
+10. IsInventoried
+	Descrição: Mostra se o produto está incluído no controle de estoque.
+	Exemplo:
+		Valor: TRUE / FALSE / NULL
+		Explicação: O sistema controla o estoque deste item.
+
+11. IsGiftCardRecharge
+	Descrição: Indica se o produto é uma recarga de cartão-presente.
+	Exemplo:
+		Valor: TRUE / FALSE / NULL
+		Explicação: Este produto não é usado para recargas de gift cards.
+
+12. BrandId
+	Descrição: Identificador da marca do produto.
+	Exemplo:
+		Valor: 2000000
+		Explicação: Código único para a marca do produto.
+
+13. BrandName
+	Descrição: Nome da marca associada ao produto.
+	Exemplo:
+		Valor: True Source
+		Explicação: Indica que o produto pertence à marca "Nike".
+
+14. IsBrandActive
+	Descrição: Mostra se a marca está ativa no sistema.
+	Exemplo:
+		Valor: TRUE / FALSE / NULL
+		Explicação: A marca está ativa e visível para os clientes.
+
+15. Dimension_cubicweight
+	Descrição: Peso cúbico calculado a partir das dimensões do produto.
+	Exemplo:
+		Valor: 0.4664
+		Explicação: Este peso é usado para calcular o custo de transporte.
+
+16. Dimension_height
+	Descrição: Altura em centímetros do produto.
+	Exemplo:
+		Valor: 30
+		Explicação: O produto tem 30 cm de altura.
+
+17. Dimension_length
+	Descrição: Comprimento em centímetros do produto.
+	Exemplo:
+		Valor: 50
+		Explicação: O produto mede 50 cm de comprimento.
+
+18. Dimension_weight
+	Descrição: Peso do produto.
+	Exemplo:
+		Valor: 1.2
+		Explicação: O produto pesa 1,2 kg.
+
+19. Dimension_width
+	Descrição: Largura em centímetros do produto.
+		Exemplo:
+		Valor: 20
+		Explicação: O produto tem 20 cm de largura.
+
+20. ProductCategories
+	Descrição: Lista de categorias às quais o produto pertence.
+	Exemplo:
+		Valor: ["Moda", "Camisetas"]
+		Explicação: O produto está nas categorias "Moda" e "Camisetas".
+
+21. Attachments
+	Descrição: Informações adiciona do produto.
+		Id
+			Representa o identificador único do anexo.
+			Exemplo: 3 indica que é o terceiro tipo de anexo configurado na VTEX.
+		Name
+			Nome do anexo.
+			No exemplo: "vtex.subscription.assinatura" significa que este anexo está relacionado ao recurso de assinatura (subscription).
+
+		Keys
+			Uma lista de chaves adicionais associadas ao anexo.
+			No exemplo: Está vazia ([]), o que indica que nenhuma chave extra foi configurada.
+
+		Fields
+			Uma lista de campos adicionais configurados para o anexo. Cada campo tem informações específicas:
+				FieldName: Nome do campo.
+					Exemplo: "vtex.subscription.key.frequency" indica a frequência de uma assinatura.
+				MaxCaracters: Quantidade máxima de caracteres permitida para esse campo.
+					Exemplo: null significa que não há limite definido.
+				DomainValues: Valores permitidos para esse campo.
+					Exemplo: "1 day, 1 month, 2 month, 3 month" indica que o cliente pode escolher entre opções de frequência como diária ou mensal.
+
+22. KeyWords
+	Descrição: Palavras-chave associadas ao produto.
+	Exemplo:
+		Valor: ["camiseta", "branca", "algodão"]
+		Explicação: Facilita a busca pelo produto.
+
+23. ReleaseDate
+	Descrição: Data de lançamento do produto.
+	Exemplo:
+		Valor: 2025-01-01T10:00:00
+		Explicação: O produto foi lançado em 1º de janeiro de 2025.
+
+24. ProductIsVisible
+	Descrição: Mostra se o produto está visível na loja.
+	Exemplo:
+		Valor: true
+		Explicação: O produto aparece no catálogo.
+
+25. ShowIfNotAvailable
+	Descrição: Indica se o produto deve ser exibido mesmo sem estoque.
+	Exemplo:
+		Valor: false
+		Explicação: O produto não será exibido se estiver fora de estoque.
+
+26. preco_custo_medio
+	Descrição: O custo médio do produto para a empresa.
+	Exemplo:
+		Valor: 45.90
+		Explicação: Este é o custo médio que a empresa paga por unidade.
+
+27. saldo_estoque
+	Descrição: Quantidade disponível em estoque.
+	Exemplo:
+		Valor: 150
+		Explicação: Existem 150 unidades disponíveis.
+
+28. data_atualizacao_warehouse
+	Descrição: Data da última atualização de informações no banco de dados
+	Exemplo:
+		Valor: 2025-01-20T15:30:00
+		Explicação: O banco de dados foi atualizado no dia 20 de janeiro de 2025 às 15h30.
+
+29. dias_zerado
+	Descrição: Número de dias em que o produto esteve fora de estoque.
+	Exemplo:
+		Valor: 5
+		Explicação: O produto ficou sem estoque por 5 dias.
+
+

@@ -1,0 +1,27 @@
+/ *STATUS ASSINANTES* /
+
+Essa tabela serve para analisar o historico do status dos assinatnes, se estão está ACTIVE, PAUSED, CANCELED, EXPIRED.
+
+1. customerId (ID do Cliente)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador único do cliente na plataforma.
+		Exemplo: "CUST12345"
+
+2. email (E-mail)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Endereço de e-mail do cliente.
+		Exemplo: "cliente@email.com"
+
+3. status (Status)
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Status atual do assinante, como ativo, inativo, ou cancelado.
+		Exemplo: "Ativo"
+
+4. data_atualizacao_warehouse (Data de Atualização no Warehouse)
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data e hora da última atualização do status do assinante no warehouse.
+		Exemplo: "2025-01-15 10:00:00"

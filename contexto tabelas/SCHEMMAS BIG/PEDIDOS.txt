@@ -1,0 +1,398 @@
+/ *PEDIDOS* /
+
+01. id_order_tiny
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador único do pedido no sistema Tiny ERP.
+		Exemplo: "12345678"
+
+02. data_pedido
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data e hora em que o pedido foi realizado.
+		Exemplo: "2025-01-27 14:35:00"
+
+03. numero_ecommerce
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Número de identificação único do pedido no e-commerce ou marketplace.
+		Exemplo: "MLB1234567890"
+
+04. data_entrega_prevista
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data estimada para entrega do pedido.
+		Exemplo: "2025-02-01 18:00:00"
+
+05. id_user_vtex
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador único do cliente na plataforma VTEX.
+		Exemplo: "user123"
+
+06. primeiro_nome
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Primeiro nome do cliente.
+		Exemplo: "João"
+
+07. last_name
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Sobrenome do cliente (último nome).
+		Exemplo: "Silva"
+
+08. email
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Endereço de e-mail do cliente.
+		Exemplo: "joao.silva@email.com"
+
+09. id_vendedor
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador único do vendedor associado ao pedido (vendedor que realizou a venda).
+		Exemplo: "seller001"
+
+10. nome_vendedor
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Nome do vendedor associado ao pedido (vendedor que realizou a venda).
+		Exemplo: "Maria Vendedora"
+
+11. situacao_anterior
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Situação anterior do pedido no fluxo.
+		Exemplo: "Aguardando pagamento"
+
+12. situacao
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Situação atual do pedido no fluxo.
+		Exemplo: "Pagamento aprovado"
+
+13. data_faturamento
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data de faturamento do pedido (data que a nota foi emitida).
+		Exemplo: "2025-01-28 10:00:00"
+
+14. data_entrega_concluida
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data de conclusão da entrega do pedido (data que o pedido foi entregue para o cliente/destinatario).
+		Exemplo: "2025-02-02 16:00:00"
+
+15. itens
+		Modelo: REPEATED
+		Tipo: RECORD
+		Descrição: Detalhes dos itens do pedido, incluindo código, nome, quantidade e valores.
+		Campos:
+			codigo: SKU do tiny, esse código também está dentro da Vtex, porem o nome da Vtex é código referência.
+			nome_produto: Nome do produto cadastrado no Tiny, Vtex ou demais marketplaces.
+			quantidade: Quantidade vendida do item.
+			valor_de: Preço original do produto ou preço cheio
+			valor_por: Preço na qual o produto foi vendido, pode ser o preço promocional do produto em alguns momentos
+			valor_desconto: valor de desconto do produto, na pratica é a diferença entre valor_de e valor_por.
+			categorias_id: id da categorai do produto, o produto pode estar cadastrado em mais de uma categoria ao mesmo tempo.
+			categorias_nome: nome da categorai do produto, o produto pode estar cadastrado em mais de uma categoria ao mesmo tempo.
+
+16. itensJSON
+		Modelo: NULLABLE
+		Tipo: JSON
+		Descrição: A coluna itensJSON contém uma lista de objetos JSON, onde cada objeto representa um item do pedido com suas informações detalhadas, incluindo categorias, código, nome, quantidade, preços, e descontos.
+		Campos:
+			categorias:
+				Uma lista de categorias associadas ao item.
+				Cada categoria tem:
+					id: Identificador único da categoria.
+					nome: Nome da categoria.
+				Exemplo: [{"id":12,"nome":"NOOTRÓPICOS"},{"id":1,"nome":"PRODUTOS"}]
+
+			codigo:
+				Código único identificador do produto.
+				Exemplo: "12519"
+
+			nome_produto:
+				Nome completo do produto, geralmente incluindo detalhes como quantidade e marca.
+				Exemplo: "Nootrópico Brain Up - 60 tabletes - True Source"
+
+			quantidade:
+				Quantidade de unidades do produto no pedido.
+				Exemplo: 2
+
+			valor_de:
+				Preço original do produto (sem descontos).
+				Exemplo: 19990 (em centavos de real, R$199,90).
+
+			valor_desconto:
+				Valor total de descontos aplicados ao produto.
+				Exemplo: -3999 (em centavos de real, R$-39,99).
+
+			valor_por:
+				Preço final do produto após aplicar os descontos.
+				Exemplo: 15991 (em centavos de real, R$159,91).
+
+		Exemplo:
+			JSON:
+				{
+				  "categorias": [
+					{"id": 12, "nome": "NOOTRÓPICOS"},
+					{"id": 1, "nome": "PRODUTOS"},
+					{"id": 16, "nome": "ENERGIA"},
+					{"id": 13, "nome": "POR OBJETIVO"}
+				  ],
+				  "codigo": "12519",
+				  "nome_produto": "Nootrópico Brain Up - 60 tabletes - True Source",
+				  "quantidade": 2,
+				  "valor_de": 19990,
+				  "valor_desconto": -3999,
+				  "valor_por": 15991
+				}
+			Categorias:
+				NOOTRÓPICOS
+				PRODUTOS
+				ENERGIA
+				POR OBJETIVO
+			Código: "12519" (identificador único do produto).
+			Nome do Produto: "Nootrópico Brain Up - 60 tabletes - True Source".
+			Quantidade: 2 unidades foram compradas.
+			Valor Original: 19990 centavos (R$199,90).
+			Desconto: -3999 centavos (R$-39,99).
+			Valor Final: 15991 centavos (R$159,91).
+
+17. assinatura_boleano
+		Modelo: NULLABLE
+		Tipo: BOOLEAN
+		Descrição: Indica se o pedido é uma assinatura.
+		Exemplo: true
+
+18. assinatura_frequencia
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Frequência da assinatura, caso aplicável.
+		Exemplo: 
+			30 dias: Mensal
+			60 dias: Bimestral
+			90 dias: Semestral
+		Obs: Não necessariamente as frequnecia de assinatura vai ser somente as que estão no exemplo, pode ser semanais, diarias, anuais e por ai vai, tambem não necessariamente vai ser, 30, 60 ou 90. pode ser de outros intervalos.
+
+19. assinatura_contagem
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Número de ciclos concluídos de uma assinatura.
+		Exemplo: 5
+
+20. nome_transportador
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Nome do transportador responsável pela entrega.
+		Exemplo: "Transportadora X"
+
+21. valor_frete
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Valor cobrado pelo frete.
+		Exemplo: R$25,50
+
+22. valor_desconto
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Valor total de descontos aplicados no pedido.
+		Exemplo: R$10,00
+
+23. total_produtos
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Valor total dos produtos do pedido, sem descontos ou frete.
+		Exemplo: R$150,00
+
+24. total_pedido_pago
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Valor total pago pelo pedido, incluindo frete e descontos.
+		Exemplo: R$165,50
+
+25. forma_frete
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Método de envio do pedido.
+		Exemplo: "Expresso"
+
+26. codigo_rastreamento
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Código de rastreamento do pedido.
+		Exemplo: "AB123456789BR"
+
+27. url_rastreamento
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: URL para rastreamento do pedido.
+		Exemplo: "https://rastreamento.transportadora.com/AB123456789BR"
+
+28. id_nota_fiscal
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Identificador único da nota fiscal associada ao pedido.
+		Exemplo: "NF12345"
+
+29. origempedido
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Origem do pedido (ex: marketplace ou loja própria).
+		Exemplo: "Marketplace"
+
+30. primeiracompra
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Indica se é a primeira compra do cliente.
+		Exemplo: "Sim"
+
+31. bairro
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Bairro do endereço de entrega.
+		Exemplo: "Centro"
+
+32. cidade
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Cidade do endereço de entrega.
+		Exemplo: "São Paulo"
+
+33. uf
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Unidade Federativa do endereço de entrega.
+		Exemplo: "SP"
+
+34. cep
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Código Postal (CEP) do endereço de entrega.
+		Exemplo: "01000-000"
+
+35. metodo_pagamento
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Método de pagamento utilizado no pedido.
+		Exemplo: "Cartão de Crédito"
+
+36. cupons
+		Modelo: REPEATED
+		Tipo: RECORD
+		Descrição: Informações dos cupons aplicados no pedido.
+		Exemplo: [{"descricao": "Cupom de desconto", "code": "DESCONTO10"}]
+		Campos:
+			code: esse código é o mesmo que o cliente adiciona no carrinho na hora que vai realizar a compra pra aplicar a promoção (front-end)
+ 			descricao: essa descrição fica localizada dentro do da promoção na qula o cupom está vinculada, ela serve para dar uma contexo a promoção e pode ser utilizada de varias formas, principalmente para descrever a condição comercial da promoção para uma rapida identificação.
+
+37. cuponsJSON
+		Modelo: NULLABLE
+		Tipo: JSON
+		Descrição: A coluna itensJSON contém uma lista de objetos JSON, onde cada objeto representa um item do pedido com suas informações detalhadas, incluindo categorias, código, nome, quantidade, preços, e descontos. 
+		Campos:
+			code:
+				Código único do cupom.
+				Exemplo: "AMIGOTRUE"
+			
+			descricao:
+				Descrição do cupom, indicando o tipo de benefício oferecido.
+				Exemplo: "Cupom - Amigo True (Brinde)"
+				
+		Exemplo:
+			JSON:
+				[
+				  {"code": "AMIGOTRUE", "descricao": "Cupom - Amigo True (Brinde)"},
+				  {"code": "AMIGOTRUE", "descricao": "Cupom - Amigo True (Frete Grátis)"}
+				]
+			Detalhamento:
+				Primeiro Cupom: Representa um cupom que concede um brinde.
+					Código: "AMIGOTRUE"
+					Descrição: "Cupom - Amigo True (Brinde)"
+					
+				Segundo Cupom: Representa um cupom que oferece frete grátis.
+					Código: "AMIGOTRUE"
+					Descrição: "Cupom - Amigo True (Frete Grátis)"
+
+38. promocoes
+		Modelo: REPEATED
+		Tipo: RECORD
+		Descrição: Promoções aplicadas ao pedido.
+		Campos:
+			nome: campo no qual conseguimos nomear a promoção.
+			descricao: a descrição fica localizada dentro do da promoção, ela serve para dar uma contexo a promoção e pode ser utilizada de varias formas, principalmente para descrever a condição comercial da promoção para uma rapida identificação.
+		Exemplo: [{"nome": "Promoção X", "descricao": "Desconto para itens selecionados"}]
+
+39. promocoesJSON
+		Modelo: NULLABLE
+		Tipo: JSON
+		Descrição: A coluna promocoesJSON contém uma lista de objetos JSON, onde cada objeto representa uma promoção aplicada no pedido. Cada promoção tem informações como o nome da promoção e uma descrição opcional.
+		Campos:
+			nome:
+				Nome da promoção que foi aplicada.
+				Exemplo: "Promoção - Frete Grátis (Região Sudeste)"
+			
+			descricao:
+				Detalhes adicionais sobre a promoção (se houver).
+				Exemplo: "Frete Grátis Região Sudeste - Excluindo ES"
+		Exemplo:
+			JSON:
+				[
+				  {"descricao": "Frete Grátis Região Sudeste - Excluindo ES", "nome": "Promoção - Frete Grátis (Região Sudeste)"},
+				  {"descricao": null, "nome": "Promoção - Aba Promoções (5% de descontos em produtos na Aba promoção)"}
+				]
+			Detalhamento:
+				Primeira Promoção:
+					Nome: "Promoção - Frete Grátis (Região Sudeste)"
+					Descrição: "Frete Grátis Região Sudeste - Excluindo ES"
+					Representa uma promoção que oferece frete grátis para a região Sudeste, exceto para o estado do Espírito Santo.
+				
+				Segunda Promoção:
+					Nome: "Promoção - Aba Promoções (5% de descontos em produtos na Aba promoção)"
+					Descrição: null (não fornecida)
+					Representa uma promoção que concede 5% de desconto em produtos listados na aba de promoções.
+
+40. count_sku_distinct
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Quantidade distinta de SKUs no pedido.
+		Exemplo: 3
+
+41. sum_sku_total
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Soma total da quantidade de SKUs no pedido.
+		Exemplo: 10
+
+42. data_atualizacao_warehouse
+		Modelo: NULLABLE
+		Tipo: DATETIME
+		Descrição: Data de atualização das informações no warehouse.
+		Exemplo: "2025-01-28 12:00:00"
+
+43. custo_produtos
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Custo total dos produtos no pedido.
+		Exemplo: R$80,00
+
+44. custo_frete
+		Modelo: NULLABLE
+		Tipo: NUMERIC
+		Descrição: Custo do frete associado ao pedido.
+		Exemplo: R$20,00
+
+45. numero_order_tiny
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Número do pedido no sistema Tiny ERP.
+		Exemplo: "ORD98765"
+
+46. numero_nota_fiscal
+		Modelo: NULLABLE
+		Tipo: STRING
+		Descrição: Número da nota fiscal gerada para o pedido.
+		Exemplo: "NF98765"

@@ -1,0 +1,123 @@
+/* TABELA ASSINATURA */
+
+01. id
+		Descrição: Identificador único de cada assinatura no sistema.
+		Tipo: STRING.
+		Exemplo: "sub12345abc".
+		Relevância: Permite rastrear e diferenciar as assinaturas no banco de dados, garantindo unicidade.
+
+02. customerId
+		Descrição: Identificador único do cliente que contratou a assinatura.
+		Tipo: STRING.
+		Exemplo: "cust001".
+		Relevância: Relaciona a assinatura a um cliente específico no sistema, permitindo consultas e relatórios baseados em clientes.
+
+03. customerEmail
+		Descrição: Endereço de e-mail do cliente associado à assinatura.
+		Tipo: STRING.
+		Exemplo: "cliente@email.com".
+		Relevância: Usado para comunicações automáticas, como notificações de cobranças ou atualizações no status da assinatura.
+
+04. title
+		Descrição: Nome ou título descritivo da assinatura.
+		Tipo: STRING.
+		Exemplo: "Plano Premium Mensal".
+		Relevância: Facilita a identificação rápida do nome da assinatura, esse campo só aparece caso o cliente editar manualmente o nome da assinatura dentro do painel de assinatura da conta dele no site.
+
+05. status
+		Descrição: Estado atual da assinatura e assinante.
+		Tipo: STRING.
+		Valores Possíveis: "active", "paused", "canceled".
+		Exemplo: "active".
+		Relevância: Indica se a assinatura está ativa, foi pausada pelo cliente ou foi cancelada, também serve para identificar o status do cliente.
+
+06. isSkipped
+		Descrição: Indica se o próximo ciclo de entrega foi pulado pelo cliente.
+		Tipo: BOOLEAN.
+		Valores Possíveis: true (sim) ou false (não).
+		Exemplo: false.
+		Relevância: Permite flexibilidade ao cliente, pausando entregas sem cancelar toda a assinatura.
+
+07. nextPurchaseDate
+		Descrição: Data da próxima compra prevista no ciclo da assinatura.
+		Tipo: STRING (Formato de data: YYYY-MM-DD).
+		Exemplo: "2025-01-31".
+		Relevância: Ajuda a organizar os ciclos de compra e prever futuras cobranças e entregas.
+
+08. lastPurchaseDate
+		Descrição: Data da última compra realizada no ciclo da assinatura.
+		Tipo: STRING (Formato de data: YYYY-MM-DD).
+		Exemplo: "2025-01-15".
+		Relevância: Histórico importante para controle de entrega e análise de retenção.
+	
+09. plan
+		Descrição: Informações detalhadas sobre o plano da assinatura.
+		Tipo: RECORD (contém campos aninhados).
+			Campos:
+			id: Identificador do plano.
+				Exemplo: "plan123"
+				frequency:
+					periodicity: Periodicidade (ex.: "monthly", "weekly", "daily").
+					interval: Intervalo de tempo entre os ciclos (ex.: 1, 2, 3).
+				validity:
+					begin: Data de início da validade do plano (ex.: "2025-01-01").
+					end: Data de término da validade do plano (ex.: "2026-01-01").
+				purchaseDay: Dia específico para realizar a compra/cobrança do pedido gerado automaticamente pelo sistema (ex.: "15").
+		Relevância: Define as regras da assinatura, como periodicidade e validade.
+
+10. shippingAddress
+		Descrição: Endereço de entrega da assinatura.
+		Tipo: JSON.
+		Exemplo: { "street": "Av. Brasil", "number": "123", "city": "São Paulo", "state": "SP", "zipCode": "01000-000" }
+		Relevância: Garante que os produtos sejam entregues no local correto.
+
+11. purchaseSettings
+		Descrição: Configurações específicas relacionadas à compra da assinatura.
+		Tipo: JSON.
+		Exemplo: { "paymentMethod": "credit_card", "autoRenewal": true }
+		Relevância: Detalha as preferências de pagamento e renovação automática.
+
+13. cycleCount
+		Descrição: Número total de ciclos já realizados para a assinatura.
+		Tipo: INTEGER.
+		Exemplo: 5.
+		Relevância: Ajuda a medir o tempo de vida da assinatura.
+
+14. createdAt
+		Descrição: Data em que a assinatura foi criada ou pedido recorrente foi gerado.
+		Tipo: STRING (Formato de data: YYYY-MM-DDTHH:MM:SS).
+		Exemplo: "2025-01-01T12:00:00".
+		Relevância: Histórico essencial para auditorias.
+
+15. lastUpdate
+		Descrição: Data da última atualização na assinatura.
+		Tipo: STRING (Formato de data: YYYY-MM-DDTHH:MM:SS).
+		Exemplo: "2025-01-15T15:30:00".
+		Relevância: Identifica quando ocorreram mudanças importantes.
+
+16. items
+		Descrição: Lista de itens incluídos na assinatura.
+		Tipo: REPEATED RECORD.
+		Campos:
+			id: Identificador único do item (ex.: "item001").
+			skuId: Código SKU do produto Vtex (ex.: "SKU12345").
+			quantity: Quantidade do produto (ex.: 3).
+			isSkipped: Indica se o item foi pulado.
+			priceAtSubscriptionDate: Preço do item na data da assinatura.
+		Relevância: Detalha o que o cliente recebe em cada ciclo.
+
+17. cycles
+		Descrição: Informações sobre os ciclos de entrega.
+		Tipo: REPEATED RECORD.
+		Campos:
+			id: Identificador do ciclo.
+			status: Estado do ciclo (ex.: "delivered", "pending").
+			date: Data do ciclo.
+			isInRetry: Indica se está em tentativa de reprocessamento.
+		Relevância: Rastreia cada entrega realizada ou tentativa.
+
+18. data_atualizacao_warehouse
+		Descrição: Data de atualização/registro das informações no banco de dados.
+		Tipo: DATETIME.
+		Exemplo: "2025-01-20T10:00:00".
+		Relevância: Garante que os dados estão sincronizados com o estoque.

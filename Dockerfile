@@ -1,33 +1,37 @@
-# Estágio de build
-FROM node:18-alpine AS builder
+FROM node:18-alpine AS development
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copiar arquivos de dependência
 COPY package*.json ./
-COPY tsconfig*.json ./
 
-# Instalar dependências
-RUN npm ci
+RUN npm install
 
-# Copiar código fonte
 COPY . .
 
-# Build da aplicação
 RUN npm run build
 
-# Estágio de produção
-FROM node:18-alpine
+FROM node:18-alpine AS production
 
-WORKDIR /usr/src/app
+ARG NODE_ENV=production
+ENV NODE_ENV=${NODE_ENV}
 
-# Copiar arquivos necessários do estágio de build
-COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/package*.json ./
+WORKDIR /app
 
-# Expor porta da aplicação
+COPY package*.json ./
+
+RUN npm install --only=production
+
+COPY --from=development /app/dist ./dist
+COPY --from=development /app/node_modules/.prisma ./node_modules/.prisma
+
+# Copiar arquivos de configuração necessários
+COPY .env.production .env
+
+# Criar diretório para credenciais
+RUN mkdir -p /app/credentials
+
+# Expor a porta da aplicação
 EXPOSE 3000
 
 # Comando para iniciar a aplicação
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "dist/main"]

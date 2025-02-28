@@ -3,6 +3,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import configuration from '@config/configuration';
+import aiConfig from '@config/ai.config';
+import vertexAiConfig from '@config/vertex-ai.config';
 import { ApiGatewayModule } from './modules/api-gateway/api-gateway.module';
 import { OrchestratorModule } from './modules/orchestrator/orchestrator.module';
 import { SemanticCacheModule } from './modules/semantic-cache/semantic-cache.module';
@@ -18,7 +20,7 @@ import { MonitoringModule } from './common/modules/monitoring.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
-      load: [configuration],
+      load: [configuration, aiConfig, vertexAiConfig],
       validationOptions: {
         allowUnknown: true,
         abortEarly: false,
