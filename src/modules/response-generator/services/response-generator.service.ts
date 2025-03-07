@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { OpenAIService } from '../../../integrations/openai/openai.service';
 import { ResponseContext, GeneratedResponse } from '../interfaces/response-context.interface';
+import { ProcessingResult } from '../../orchestrator/interfaces/conversation.interface';
+import { GenerateResponseParams } from '../interfaces/response-generator.interface';
 
 @Injectable()
 export class ResponseGeneratorService implements OnModuleInit {
@@ -29,44 +31,88 @@ export class ResponseGeneratorService implements OnModuleInit {
     }
   }
 
-  async generateResponse(context: ResponseContext): Promise<GeneratedResponse> {
+  async generateResponse(params: GenerateResponseParams): Promise<ProcessingResult> {
     try {
-      this.logger.debug(`Gerando resposta para pergunta: "${context.question}"`);
-      const startTime = context.metadata?.startTime || new Date();
-      const prompt = this.buildPrompt(context);
+      this.logger.debug(`Gerando resposta para pergunta: "${params.question}"`);
+      const startTime = params.metadata?.startTime || Date.now();
 
-      // Obter resposta do OpenAI (agora retorna uma string)
+      // Verificar se estamos adaptando uma resposta do cache
+      const isAdaptingFromCache = params.metadata?.adaptFromCache === true;
+      if (isAdaptingFromCache) {
+        this.logger.debug(`Modo de adaptação de cache ativado para pergunta: "${params.question}"`);
+      }
+
+      // Construir o prompt apropriado
+      const prompt = this.buildPrompt(params);
+
+      // Obter resposta do OpenAI
       this.logger.debug('Enviando prompt para o OpenAI');
-      const responseText = await this.openAIService.generateResponse(prompt);
+      let responseText: string;
+
+      try {
+        responseText = await this.openAIService.generateResponse(prompt);
+      } catch (aiError) {
+        this.logger.error(`Erro ao gerar resposta com OpenAI: ${aiError instanceof Error ? aiError.message : String(aiError)}`);
+
+        // Se estamos adaptando do cache e ocorreu um erro, retornar a resposta original
+        if (isAdaptingFromCache && params.queryResult?.metadata?.originalResponse) {
+          this.logger.warn('Fallback: usando resposta original do cache devido a erro na adaptação');
+          responseText = params.queryResult.metadata.originalResponse;
+        } else {
+          // Se não estamos adaptando ou não temos resposta original, lançar o erro
+          throw aiError;
+        }
+      }
 
       // Calcular tempo de processamento
-      const endTime = new Date();
-      const processingTimeMs = endTime.getTime() - (
-        typeof startTime === 'number' ? startTime : startTime.getTime()
-      );
+      const endTime = Date.now();
+      const processingTimeMs = endTime - startTime;
       this.logger.debug(`Resposta gerada em ${processingTimeMs}ms`);
 
       // Extrair tabelas e SQL do contexto
-      const tables = context.tables || [];
-      const sql = context.query || context.queryResult?.metadata?.sql || '';
+      const tables = params.tables || [];
+      const sql = params.query || params.queryResult?.metadata?.sql || '';
 
       // Gerar sugestões de perguntas relacionadas
-      const suggestions = this.generateSuggestions(context.question, responseText);
+      const suggestions = this.generateSuggestions(params.question, responseText);
+
+      // Construir metadados apropriados
+      const metadata: any = {
+        source: isAdaptingFromCache ? 'cache' : 'generated',
+        confidence: isAdaptingFromCache ? 0.9 : 0.95, // Ligeiramente menor para adaptações
+        processingTimeMs,
+        tables,
+        sql,
+      };
+
+      // Se estamos adaptando, incluir informações adicionais
+      if (isAdaptingFromCache) {
+        metadata.adaptedFromCache = true;
+        metadata.originalQuestion = params.queryResult?.metadata?.originalQuestion;
+        // Não temos acesso direto ao cacheId aqui, então não o incluímos
+      }
 
       return {
         message: responseText,
         suggestions: suggestions,
-        metadata: {
-          processingTimeMs,
-          source: 'query',
-          confidence: 0.9, // Valor padrão, pode ser ajustado com base em lógica específica
-          tables,
-          sql,
-        }
+        metadata
       };
     } catch (error) {
-      this.logger.error('Erro ao gerar resposta:', error);
-      throw new Error('Erro ao gerar resposta');
+      this.logger.error(`Erro ao gerar resposta: ${error instanceof Error ? error.message : String(error)}`);
+
+      // Retornar uma resposta de erro amigável
+      return {
+        message: 'Desculpe, ocorreu um erro ao processar sua pergunta. Por favor, tente novamente.',
+        metadata: {
+          source: 'error',
+          processingTimeMs: 0,
+          error: {
+            type: 'generation_error',
+            details: error instanceof Error ? error.message : String(error)
+          }
+        },
+        suggestions: []
+      };
     }
   }
 
@@ -83,8 +129,56 @@ export class ResponseGeneratorService implements OnModuleInit {
     return defaultSuggestions;
   }
 
-  private buildPrompt(context: ResponseContext): string {
-    const { question, queryResult, data, query, tables } = context;
+  private buildPrompt(params: GenerateResponseParams): string {
+    const { question, queryResult, data, query, tables } = params;
+
+    // Verificar se estamos adaptando uma resposta do cache
+    if (params.metadata?.adaptFromCache && queryResult?.metadata?.originalResponse) {
+      this.logger.debug(`Adaptando resposta do cache para a pergunta: "${question}"`);
+
+      const originalQuestion = queryResult.metadata.originalQuestion || '';
+      const originalResponse = queryResult.metadata.originalResponse || '';
+      const sql = queryResult.metadata.sql || '';
+
+      // Construir um prompt especial para adaptação de resposta
+      return `
+        ${this.template}
+
+        TAREFA: Adaptar uma resposta existente para uma nova pergunta.
+
+        PERGUNTA ORIGINAL: ${originalQuestion}
+
+        RESPOSTA ORIGINAL: ${originalResponse}
+
+        SQL UTILIZADO: ${sql}
+
+        NOVA PERGUNTA: ${question}
+
+        INSTRUÇÕES DETALHADAS:
+        1. Analise cuidadosamente a diferença entre a pergunta original e a nova pergunta.
+        2. Identifique quais informações da resposta original são relevantes para a nova pergunta.
+        3. Adapte a resposta para responder PRECISAMENTE à nova pergunta, sem informações extras.
+        4. Mantenha o estilo, tom e formatação da resposta original (emojis, negrito, etc).
+        5. Se a nova pergunta pedir menos informações (ex: "top 1" em vez de "top 3"), forneça APENAS as informações solicitadas.
+        6. Se a nova pergunta pedir mais informações que não estão disponíveis na resposta original, indique claramente que você está limitado aos dados disponíveis.
+
+        EXEMPLOS:
+
+        Exemplo 1:
+        - Pergunta Original: "Quais foram os 3 produtos mais vendidos em janeiro?"
+        - Resposta Original: "Os três produtos mais vendidos em janeiro foram: 1. Produto A (100 unidades), 2. Produto B (80 unidades), 3. Produto C (70 unidades)"
+        - Nova Pergunta: "Qual foi o produto mais vendido em janeiro?"
+        - Resposta Adaptada: "O produto mais vendido em janeiro foi o Produto A com 100 unidades vendidas."
+
+        Exemplo 2:
+        - Pergunta Original: "Qual foi o faturamento total de 2024?"
+        - Resposta Original: "O faturamento total de 2024 foi de R$ 1.500.000,00."
+        - Nova Pergunta: "Qual foi o faturamento médio mensal de 2024?"
+        - Resposta Adaptada: "Com base no faturamento total de 2024 de R$ 1.500.000,00, o faturamento médio mensal foi de R$ 125.000,00."
+
+        RESPOSTA ADAPTADA:
+      `;
+    }
 
     // Extrair dados do queryResult se disponível
     const resultData = queryResult?.rows || data || [];
@@ -97,10 +191,18 @@ export class ResponseGeneratorService implements OnModuleInit {
     const prompt = `
       ${this.template}
 
-      Pergunta: ${question}
-      Dados: ${JSON.stringify(resultData, null, 2)}
-      Query executada: ${resultQuery}
-      Tabelas utilizadas: ${resultTables.join(', ')}
+      PERGUNTA: ${question}
+
+      DADOS:
+      ${JSON.stringify(resultData, null, 2)}
+
+      SQL:
+      ${resultQuery}
+
+      TABELAS:
+      ${resultTables.join(', ')}
+
+      RESPOSTA:
     `;
 
     return prompt;

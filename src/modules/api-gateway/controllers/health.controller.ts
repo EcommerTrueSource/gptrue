@@ -1,9 +1,9 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, Inject } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { BigQueryService } from '../../../database/bigquery/bigquery.service';
 import { VertexAIService } from '../../../integrations/vertex-ai/vertex-ai.service';
 import { OpenAIService } from '../../../integrations/openai/openai.service';
-import { SemanticCacheService } from '../../semantic-cache/services/semantic-cache.service';
+import { BIGQUERY_SERVICE, IBigQueryService } from '../../../database/bigquery/interfaces/bigquery.interface';
+import { SEMANTIC_CACHE_SERVICE, ISemanticCacheService } from '../../semantic-cache/interfaces/semantic-cache.interface';
 
 @ApiTags('Health Check')
 @Controller('health')
@@ -11,10 +11,12 @@ export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
   constructor(
-    private readonly bigQueryService: BigQueryService,
+    @Inject(BIGQUERY_SERVICE)
+    private readonly bigQueryService: IBigQueryService,
     private readonly vertexAIService: VertexAIService,
     private readonly openAIService: OpenAIService,
-    private readonly semanticCacheService: SemanticCacheService,
+    @Inject(SEMANTIC_CACHE_SERVICE)
+    private readonly semanticCacheService: ISemanticCacheService,
   ) {}
 
   @Get('bigquery')
@@ -72,7 +74,7 @@ export class HealthController {
   async testPinecone() {
     try {
       // Testa a conexão verificando o status do índice
-      const status = await this.semanticCacheService.checkConnection();
+      const status = await this.semanticCacheService.checkHealth();
       return { status: 'ok', message: 'Conexão com Pinecone estabelecida', details: status };
     } catch (error) {
       this.logger.error('Erro ao testar conexão com Pinecone', error);

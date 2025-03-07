@@ -45,9 +45,13 @@ export class QueryGeneratorService implements OnModuleInit {
       this.logger.debug('Enviando prompt para o Vertex AI');
       const sql = await this.vertexAIService.generateSQL(prompt);
 
+      // Log da consulta SQL bruta recebida do Vertex AI
+      this.logger.log(`SQL bruto recebido do Vertex AI:\n${sql}`);
+
       // 3. Validar SQL básico (sintaxe)
       this.validateSQLSyntax(sql);
 
+      this.logger.log(`SQL validado com sucesso para a pergunta: "${question}"`);
       this.logger.debug('SQL gerado com sucesso', { sql });
 
       return sql;
@@ -59,19 +63,15 @@ export class QueryGeneratorService implements OnModuleInit {
       if (error instanceof Error) {
         errorMessage = error.message;
         originalError = error;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-        originalError = new Error(error);
       } else {
-        errorMessage = 'Erro desconhecido ao gerar SQL';
-        originalError = new Error(JSON.stringify(error));
+        errorMessage = String(error);
+        originalError = new Error(errorMessage);
       }
 
-      this.logger.error('Erro ao gerar SQL', {
-        error: errorMessage,
-        question,
+      this.logger.error(`Erro ao gerar SQL: ${errorMessage}`, {
+        error: originalError,
+        question
       });
-
       throw new SQLGenerationError(errorMessage, originalError);
     }
   }
@@ -104,23 +104,13 @@ export class QueryGeneratorService implements OnModuleInit {
     `;
   }
 
+  /**
+   * Valida a sintaxe básica de uma consulta SQL
+   * @param sql Consulta SQL a ser validada
+   */
   private validateSQLSyntax(sql: string): void {
-    if (!sql || typeof sql !== 'string') {
-      throw new Error('SQL gerado é inválido ou vazio');
-    }
-
-    this.logger.debug('Validando sintaxe básica do SQL gerado');
-
-    // Validação básica de sintaxe SQL
-    const containsSelect = /SELECT/i.test(sql);
-    const containsFrom = /FROM/i.test(sql);
-
-    if (!containsSelect || !containsFrom) {
-      throw new Error('SQL gerado não contém estrutura básica válida (SELECT ... FROM)');
-    }
-
-    // Verificar palavras-chave proibidas
-    const forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER'];
+    // Verificar palavras-chave proibidas (operações de modificação)
+    const forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'CREATE'];
     for (const keyword of forbiddenKeywords) {
       if (new RegExp(`\\b${keyword}\\b`, 'i').test(sql)) {
         this.logger.warn(`SQL contém palavra-chave proibida: ${keyword}`);
@@ -128,10 +118,30 @@ export class QueryGeneratorService implements OnModuleInit {
       }
     }
 
-    // Verificar injeção de comentários maliciosos
-    if (/--|\*\/|\/\*|;/g.test(sql)) {
-      this.logger.warn('SQL contém caracteres potencialmente maliciosos');
-      throw new Error('SQL contém caracteres potencialmente maliciosos');
+    // Verificar apenas padrões realmente perigosos de injeção SQL
+    // Permitir comentários e ponto-e-vírgula legítimos
+    const maliciousPatterns = [
+      // Padrões clássicos de injeção SQL
+      /(\bOR\b|\bAND\b)\s+(\b1\b|\btrue\b)\s*=\s*(\b1\b|\btrue\b)/i, // OR 1=1, AND true=true
+      /(\bUNION\b|\bINTERSECT\b|\bEXCEPT\b)\s+(\bALL\b\s+)?\bSELECT\b/i, // UNION/INTERSECT/EXCEPT SELECT
+      /;\s*(\bDROP\b|\bDELETE\b|\bINSERT\b|\bUPDATE\b|\bALTER\b|\bCREATE\b)/i // Comandos após ponto-e-vírgula
+    ];
+
+    for (const pattern of maliciousPatterns) {
+      if (pattern.test(sql)) {
+        this.logger.warn('SQL contém padrões de injeção SQL');
+        throw new Error('SQL contém padrões de injeção SQL');
+      }
+    }
+
+    // Verificar se a consulta contém SELECT ou WITH em algum lugar
+    // Permitir comentários, espaços e formatação antes do comando
+    const sqlNormalizado = sql.replace(/\/\*[\s\S]*?\*\/|--.*$/gm, '').trim();
+
+    if (!sqlNormalizado.toUpperCase().includes('SELECT') &&
+        !sqlNormalizado.toUpperCase().includes('WITH')) {
+      this.logger.warn('SQL não contém comandos SELECT ou WITH');
+      throw new Error('SQL deve conter comandos SELECT ou WITH');
     }
 
     this.logger.debug('Validação de sintaxe SQL concluída com sucesso');

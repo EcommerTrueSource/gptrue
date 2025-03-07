@@ -40,6 +40,12 @@ export interface Metrics {
     stack?: string;
     timestamp: Date;
   }>;
+  cacheAdaptation: {
+    attempts: number;
+    success: number;
+    failure: number;
+    skipped: number;
+  };
 }
 
 /**

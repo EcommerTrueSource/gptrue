@@ -1,11 +1,15 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Inject } from '@nestjs/common';
 import { FeedbackService } from '../services/feedback.service';
 import { FeedbackDto } from '../dtos/feedback.dto';
 import { MockAuthGuard } from '../../../common/guards/mock-auth.guard';
+import { FEEDBACK_SERVICE, IFeedbackService } from '../interfaces/feedback.interface';
 
 @Controller('feedback')
 export class FeedbackController {
-  constructor(private readonly feedbackService: FeedbackService) {}
+  constructor(
+    @Inject(FEEDBACK_SERVICE)
+    private readonly feedbackService: IFeedbackService
+  ) {}
 
   /**
    * Endpoint para enviar feedback

@@ -33,3 +33,24 @@ export interface CacheConfig {
   ttlDays: number;
   namespace: string;
 }
+
+/**
+ * Interface para armazenar informações estruturadas extraídas de perguntas
+ */
+export interface QueryInformation {
+  queryType: 'topN' | 'position' | 'unknown';
+  position: number;
+  topN: number;
+  timeframe: {
+    month: string;
+    year: string;
+  };
+  entities: Array<{
+    type: string;
+    value: string;
+  }>;
+  metrics: string[];
+  isPositionQuery: boolean;
+  isTopNQuery: boolean;
+  originalText: string;
+}

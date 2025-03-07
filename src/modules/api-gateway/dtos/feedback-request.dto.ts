@@ -133,59 +133,18 @@ export class FeedbackRequestDto {
 }
 
 export class FeedbackResponseDto {
-  @ApiProperty({
-    description: 'ID único do feedback',
-    example: 'feed_123456789'
-  })
+  @ApiProperty({ description: 'ID único do feedback' })
   id: string;
 
-  @ApiProperty({
-    description: 'ID da resposta que recebeu feedback',
-    example: 'resp_123456789'
-  })
+  @ApiProperty({ description: 'ID da conversa' })
+  conversationId: string;
+
+  @ApiProperty({ description: 'ID da resposta que recebeu feedback' })
   responseId: string;
 
-  @ApiProperty({
-    description: 'Tipo do feedback',
-    enum: FeedbackType,
-    example: FeedbackType.POSITIVE
-  })
-  type: FeedbackType;
-
-  @ApiProperty({
-    description: 'Data e hora do registro do feedback',
-    example: '2024-02-26T15:30:00Z'
-  })
-  timestamp: Date;
-
-  @ApiProperty({
-    description: 'Status do processamento do feedback',
-    example: 'processed',
-    enum: ['pending', 'processed', 'failed']
-  })
+  @ApiProperty({ description: 'Status do processamento do feedback', example: 'success' })
   status: string;
 
-  @ApiPropertyOptional({
-    description: 'Ações tomadas com base no feedback',
-    example: [
-      'Template atualizado no cache',
-      'Métricas de qualidade atualizadas'
-    ]
-  })
-  actions?: string[];
-
-  @ApiPropertyOptional({
-    description: 'Sugestões geradas com base no feedback',
-    example: {
-      improvedQuestion: 'Qual foi o faturamento total dos 5 produtos mais vendidos no último mês?',
-      relatedQuestions: [
-        'Como está a margem de lucro desses produtos?',
-        'Qual a tendência de vendas desses produtos nos últimos 6 meses?'
-      ]
-    }
-  })
-  suggestions?: {
-    improvedQuestion?: string;
-    relatedQuestions?: string[];
-  };
+  @ApiProperty({ description: 'Mensagem informativa sobre o processamento', example: 'Feedback registrado com sucesso' })
+  message: string;
 }

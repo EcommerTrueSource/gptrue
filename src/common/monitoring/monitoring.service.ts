@@ -27,6 +27,12 @@ export class MonitoringService {
       openAI: 0,
     },
     errors: [],
+    cacheAdaptation: {
+      attempts: 0,
+      success: 0,
+      failure: 0,
+      skipped: 0,
+    },
   };
 
   private readonly alertThresholds: AlertThresholds = {
@@ -206,6 +212,47 @@ export class MonitoringService {
   }
 
   /**
+   * Registra uma operação de adaptação de resposta do cache
+   * @param result Resultado da adaptação ('success', 'failure' ou 'skipped')
+   */
+  recordCacheAdaptation(result: 'success' | 'failure' | 'skipped'): void {
+    try {
+      // Incrementar o contador de tentativas
+      this.metrics.cacheAdaptation.attempts++;
+
+      // Incrementar o contador específico
+      switch (result) {
+        case 'success':
+          this.metrics.cacheAdaptation.success++;
+          break;
+        case 'failure':
+          this.metrics.cacheAdaptation.failure++;
+          break;
+        case 'skipped':
+          this.metrics.cacheAdaptation.skipped++;
+          break;
+      }
+
+      // Calcular taxa de sucesso
+      const totalAttempts = this.metrics.cacheAdaptation.attempts;
+      if (totalAttempts > 10) {
+        const successRate = this.metrics.cacheAdaptation.success / totalAttempts;
+        const failureRate = this.metrics.cacheAdaptation.failure / totalAttempts;
+
+        // Alertar se a taxa de falha for alta
+        if (failureRate > 0.2) { // 20% de falhas
+          this.logger.warn(`Taxa de falha na adaptação de cache alta: ${(failureRate * 100).toFixed(2)}%`);
+        }
+
+        // Registrar estatísticas
+        this.logger.debug(`Estatísticas de adaptação de cache - Sucesso: ${(successRate * 100).toFixed(2)}%, Falha: ${(failureRate * 100).toFixed(2)}%, Ignoradas: ${((this.metrics.cacheAdaptation.skipped / totalAttempts) * 100).toFixed(2)}%`);
+      }
+    } catch (error: any) {
+      this.logger.error(`Erro ao registrar adaptação de cache: ${error.message}`, error.stack);
+    }
+  }
+
+  /**
    * Obtém todas as métricas
    * @returns Métricas coletadas
    */
@@ -314,6 +361,12 @@ export class MonitoringService {
         openAI: 0,
       },
       errors: [],
+      cacheAdaptation: {
+        attempts: 0,
+        success: 0,
+        failure: 0,
+        skipped: 0,
+      },
     };
   }
 }

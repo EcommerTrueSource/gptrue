@@ -7,6 +7,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import * as fs from 'fs';
 import * as path from 'path';
+import { FeedbackType } from '../../api-gateway/dtos/feedback-request.dto';
 
 @Injectable()
 export class FeedbackService implements OnModuleInit {
@@ -66,7 +67,8 @@ export class FeedbackService implements OnModuleInit {
 
       // Atualizar o template no cache semântico
       await this.semanticCacheService.updateFeedback(feedback.question, {
-        type: feedback.type,
+        type: feedback.type as FeedbackType,
+        helpful: feedback.type === 'positive',
         comment: feedback.comment,
       });
 

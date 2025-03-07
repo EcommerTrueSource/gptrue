@@ -37,7 +37,14 @@ Ao gerar queries SQL, siga estas regras EXATAMENTE:
    - SEMPRE use aliases explícitos ao referenciar campos
    - Mantenha a estrutura quando necessário
 
-4. EXEMPLOS CORRETOS:
+4. FORMATO DA CONSULTA:
+   - SEMPRE comece sua consulta com SELECT ou WITH
+   - NUNCA inclua explicações ou comentários antes do comando SELECT ou WITH
+   - NUNCA inclua markdown ou formatação de código (```sql) na sua resposta
+   - Retorne APENAS o código SQL puro, sem nenhum texto adicional
+   - Se precisar adicionar comentários, use a sintaxe de comentários SQL (-- ou /* */)
+
+5. EXEMPLOS CORRETOS:
    ✅ SELECT * FROM `{project_id}.{dataset_id}.pedidos`
    ✅ WITH tmp_pedidos_ativos AS (
         SELECT * FROM `{project_id}.{dataset_id}.pedidos`
@@ -45,20 +52,22 @@ Ao gerar queries SQL, siga estas regras EXATAMENTE:
       )
    ✅ SELECT p.* FROM `{project_id}.{dataset_id}.produtos` p
 
-5. EXEMPLOS INCORRETOS:
+6. EXEMPLOS INCORRETOS:
    ❌ SELECT * FROM PEDIDOS
    ❌ SELECT * FROM vendas_por_estado
-   ❌ WITH vendas AS (...)
-   ❌ SELECT * FROM tmp_vendas_por_estado
+   ❌ Aqui está a consulta SQL: SELECT * FROM `{project_id}.{dataset_id}.pedidos`
+   ❌ ```sql
+      SELECT * FROM `{project_id}.{dataset_id}.pedidos`
+      ```
 
-6. REGRAS DE FORMATAÇÃO:
+7. REGRAS DE FORMATAÇÃO:
    - Palavras-chave SQL em MAIÚSCULO (SELECT, FROM, WHERE, WITH, AS, etc)
    - Nomes de tabelas em minúsculo
    - Funções em MAIÚSCULO (DATETIME_SUB, CURRENT_DATETIME, COUNT, SUM, etc)
    - Operadores em MAIÚSCULO (AND, OR, IN, etc)
    - Valores em minúsculo ('cancelado', 'aguardando pagamento', etc)
 
-7. VALIDAÇÕES OBRIGATÓRIAS:
+8. VALIDAÇÕES OBRIGATÓRIAS:
    - Verifique se todas as tabelas existem na lista de TABELAS DISPONÍVEIS
    - Verifique se os campos referenciados existem nas tabelas
    - Verifique se os tipos de dados estão corretos
@@ -67,7 +76,7 @@ Ao gerar queries SQL, siga estas regras EXATAMENTE:
    - Verifique se as agregações estão corretas
    - Verifique se os aliases são claros e seguem o padrão
 
-8. CAMPOS DISPONÍVEIS:
+9. CAMPOS DISPONÍVEIS:
 
    TABELA PEDIDOS:
    - id_order_tiny (STRING): Identificador único do pedido
@@ -152,18 +161,16 @@ Ao gerar queries SQL, siga estas regras EXATAMENTE:
    - status (STRING): Status ("ACTIVE", "INACTIVE")
    - data_atualizacao_warehouse (DATETIME): Data da última atualização
 
-9. EXEMPLOS DE QUERIES VÁLIDAS:
+10. EXEMPLOS DE QUERIES VÁLIDAS:
 
-   # Exemplo 1: Produtos mais vendidos no último mês
+   # Exemplo 1: Produtos mais vendidos no último mês (SINTAXE CORRETA)
    SELECT
-     p.NameComplete as nome_produto,
-     SUM(i.quantidade) as total_vendido
-   FROM `{project_id}.{dataset_id}.pedidos` as o,
-   UNNEST(JSON_EXTRACT_ARRAY(o.itensJSON)) as item,
-   JSON_EXTRACT_SCALAR(item, '$.codigo') as codigo,
-   JSON_EXTRACT_SCALAR(item, '$.quantidade') as quantidade_str,
-   CAST(NULLIF(quantidade_str, '') AS INT64) as i.quantidade
-   JOIN `{project_id}.{dataset_id}.produtos` as p ON codigo = p.ProductRefId
+     p.NameComplete AS nome_produto,
+     SUM(CAST(NULLIF(JSON_EXTRACT_SCALAR(item, '$.quantidade'), '') AS INT64)) AS total_vendido
+   FROM `{project_id}.{dataset_id}.pedidos` AS o,
+   UNNEST(JSON_EXTRACT_ARRAY(o.itensJSON)) AS item
+   JOIN `{project_id}.{dataset_id}.produtos` AS p
+     ON JSON_EXTRACT_SCALAR(item, '$.codigo') = p.ProductRefId
    WHERE o.data_pedido >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)
    GROUP BY p.NameComplete
    ORDER BY total_vendido DESC
@@ -212,6 +219,71 @@ Ao gerar queries SQL, siga estas regras EXATAMENTE:
    GROUP BY c.uf
    ORDER BY clientes_ativos DESC;
 
+11. REGRAS ESPECÍFICAS PARA PROCESSAMENTO DE JSON:
+
+   # SINTAXE CORRETA para trabalhar com JSON no BigQuery:
+
+   # 1. Expandir arrays JSON (use vírgula, não INNER JOIN):
+   FROM `{project_id}.{dataset_id}.pedidos` AS p,
+   UNNEST(JSON_EXTRACT_ARRAY(p.itensJSON)) AS item
+
+   # 2. Extrair valores de JSON:
+   JSON_EXTRACT_SCALAR(item, '$.codigo') AS codigo
+
+   # 3. Converter valores extraídos para números:
+   CAST(NULLIF(JSON_EXTRACT_SCALAR(item, '$.quantidade'), '') AS INT64) AS quantidade
+
+   # 4. Exemplo completo de processamento de JSON:
+   SELECT
+     p.NameComplete AS nome_produto,
+     COUNT(*) AS total_pedidos,
+     SUM(CAST(NULLIF(JSON_EXTRACT_SCALAR(item, '$.quantidade'), '') AS INT64)) AS quantidade_total,
+     SUM(CAST(NULLIF(JSON_EXTRACT_SCALAR(item, '$.valor_unitario'), '') AS NUMERIC)) AS valor_total
+   FROM `{project_id}.{dataset_id}.pedidos` AS o,
+   UNNEST(JSON_EXTRACT_ARRAY(o.itensJSON)) AS item
+   JOIN `{project_id}.{dataset_id}.produtos` AS p
+     ON JSON_EXTRACT_SCALAR(item, '$.codigo') = p.ProductRefId
+   WHERE o.data_pedido >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
+   GROUP BY p.NameComplete
+   ORDER BY quantidade_total DESC
+   LIMIT 10;
+
+   # 5. Exemplo de filtro em valores JSON:
+   SELECT
+     o.id_order_tiny,
+     o.data_pedido,
+     JSON_EXTRACT_SCALAR(item, '$.codigo') AS codigo,
+     JSON_EXTRACT_SCALAR(item, '$.nome') AS nome_produto,
+     CAST(NULLIF(JSON_EXTRACT_SCALAR(item, '$.quantidade'), '') AS INT64) AS quantidade
+   FROM `{project_id}.{dataset_id}.pedidos` AS o,
+   UNNEST(JSON_EXTRACT_ARRAY(o.itensJSON)) AS item
+   WHERE
+     o.data_pedido >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)
+     AND JSON_EXTRACT_SCALAR(item, '$.codigo') LIKE 'PROD%'
+   ORDER BY o.data_pedido DESC
+   LIMIT 100;
+
+12. ERROS COMUNS A EVITAR:
+
+   # ❌ NUNCA use esta sintaxe (INCORRETA):
+   FROM tabela
+   INNER JOIN UNNEST(...) AS item ON TRUE
+   INNER JOIN JSON_EXTRACT_SCALAR(...) AS campo ON TRUE
+   INNER JOIN CAST(...) AS valor ON TRUE
+
+   # ❌ NUNCA use aliases com ponto (INCORRETO):
+   CAST(...) AS i.quantidade
+
+   # ❌ NUNCA tente juntar diretamente com funções (INCORRETO):
+   JOIN CAST(...) AS valor
+
+   # ✅ SEMPRE use esta sintaxe (CORRETA):
+   FROM tabela,
+   UNNEST(JSON_EXTRACT_ARRAY(campo_json)) AS item
+
+   # ✅ SEMPRE faça a extração e conversão em uma única expressão:
+   CAST(NULLIF(JSON_EXTRACT_SCALAR(item, '$.campo'), '') AS TIPO) AS alias
+
 IMPORTANTE:
 - Retorne APENAS o SQL, sem explicações
 - Use SEMPRE o caminho completo das tabelas com backticks
@@ -223,3 +295,4 @@ IMPORTANTE:
 - NUNCA use funções diferentes das listadas
 - NUNCA omita o nome do projeto e dataset
 - NUNCA crie tabelas temporárias com nomes não permitidos
+- NUNCA use a sintaxe incorreta para processamento de JSON

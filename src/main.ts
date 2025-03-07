@@ -9,6 +9,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { Logger } from '@nestjs/common';
 import { setupSwagger } from './config/swagger.config';
 import { SensitiveDataInterceptor } from './common/interceptors/sensitive-data.interceptor';
+import { WinstonLogger } from './common/utils/winston-logger';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
@@ -58,13 +59,28 @@ async function bootstrap(): Promise<void> {
           winston.format.printf(({ timestamp, level, message, ...meta }) => {
             return `[${timestamp}] ${level}: ${message} ${Object.keys(meta).length ? JSON.stringify(meta) : ''}`;
           })
-        ),
+        )
       }),
-    ],
+      new winston.transports.File({
+        filename: 'logs/error.log',
+        level: 'error',
+        format: winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.json()
+        )
+      }),
+      new winston.transports.File({
+        filename: 'logs/combined.log',
+        format: winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.json()
+        )
+      })
+    ]
   });
 
-  // Configuração do logger global
-  app.useLogger(winstonLogger);
+  // Configurar o NestJS para usar o Winston Logger
+  app.useLogger(new WinstonLogger(winstonLogger));
 
   // Configuração do Swagger
   setupSwagger(app);

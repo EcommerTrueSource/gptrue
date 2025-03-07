@@ -12,6 +12,7 @@ interface ResponseJobData {
       format?: string;
       includeMetadata?: boolean;
     };
+    startTime?: number;
   };
 }
 
@@ -55,7 +56,9 @@ export class ResponseProcessor {
       const response = await this.responseGeneratorService.generateResponse({
         question,
         queryResult,
-        config: context?.config || {},
+        metadata: {
+          startTime: context?.startTime || Date.now(),
+        },
       });
 
       await job.progress(100);

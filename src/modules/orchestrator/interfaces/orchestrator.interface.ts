@@ -34,6 +34,10 @@ export interface Template {
   feedback: {
     positive: number;
     negative: number;
+    comments: string[];
+    needsReview: boolean;
+    categories?: string[];
+    lastFeedbackDate?: string;
   };
 }
 
@@ -89,7 +93,7 @@ export interface IOrchestratorService {
   // Conversação
   processConversation(request: ConversationRequestDto): Promise<ConversationResponseDto>;
   getConversation(id: string): Promise<ConversationResponseDto>;
-  processFeedback(id: string, feedback: FeedbackRequestDto): Promise<FeedbackResponseDto>;
+  processFeedback(request: FeedbackRequestDto): Promise<FeedbackResponseDto>;
 
   // Métricas e Monitoramento
   getMetrics(startDate?: string, endDate?: string): Promise<MetricsResponse>;

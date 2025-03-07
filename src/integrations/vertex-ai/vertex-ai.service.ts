@@ -34,7 +34,7 @@ export class VertexAIService {
     this.model = this.configService.get<string>('vertexai.model') ||
                 this.configService.get<string>('ai.vertexAi.model') ||
                 process.env.VERTEX_AI_MODEL ||
-                'text-bison@001';
+                'gemini-1.0-pro';
 
     // Verificar se existe o arquivo de credenciais
     const keyFilePath = this.configService.get<string>('bigquery.keyFilename') ||
@@ -61,7 +61,10 @@ export class VertexAIService {
 
   async generateSQL(prompt: string): Promise<string> {
     try {
-      const generativeModel = this.vertexai.preview.getGenerativeModel({
+      this.logger.debug('Iniciando geração de SQL com Vertex AI');
+
+      // Usar a API correta para o modelo Gemini
+      const generativeModel = this.vertexai.getGenerativeModel({
         model: this.model,
         generationConfig: {
           maxOutputTokens: 1024,
@@ -69,8 +72,58 @@ export class VertexAIService {
         },
       });
 
-      const result = await generativeModel.generateContent(prompt);
-      return result.response.candidates[0].content.parts[0].text;
+      // Formatar a requisição para o modelo Gemini
+      const request = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+      };
+
+      // Gerar o conteúdo
+      this.logger.debug('Enviando requisição para o Vertex AI');
+      const result = await generativeModel.generateContent(request);
+
+      // Extrair o texto da resposta
+      const response = result.response;
+      let text = response.candidates[0].content.parts[0].text;
+
+      this.logger.debug('Resposta bruta recebida do Vertex AI', { rawResponse: text });
+
+      // Processar o texto para extrair apenas a consulta SQL
+      // Remover blocos de código markdown se presentes
+      text = text.replace(/```sql\s*|\s*```/g, '');
+
+      // Remover explicações ou texto antes da consulta
+      if (text.toUpperCase().includes('SELECT') || text.toUpperCase().includes('WITH')) {
+        // Encontrar o início da consulta SQL
+        const selectIndex = text.toUpperCase().indexOf('SELECT');
+        const withIndex = text.toUpperCase().indexOf('WITH');
+
+        let startIndex = -1;
+        if (selectIndex >= 0 && withIndex >= 0) {
+          startIndex = Math.min(selectIndex, withIndex);
+        } else if (selectIndex >= 0) {
+          startIndex = selectIndex;
+        } else if (withIndex >= 0) {
+          startIndex = withIndex;
+        }
+
+        if (startIndex >= 0) {
+          const originalText = text;
+          text = text.substring(startIndex);
+          this.logger.debug('SQL processado', {
+            original: originalText,
+            processed: text,
+            startIndex
+          });
+        }
+      }
+
+      this.logger.debug('SQL gerado e processado com sucesso', { sql: text });
+      return text;
     } catch (error) {
       this.logger.error('Erro ao gerar SQL com VertexAI', error);
       throw new Error(`Falha ao gerar SQL com VertexAI: ${error instanceof Error ? error.message : String(error)}`);

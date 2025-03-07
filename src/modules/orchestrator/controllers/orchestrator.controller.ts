@@ -45,6 +45,9 @@ export class OrchestratorController {
     @Param('id') id: string,
     @Body() feedback: FeedbackRequestDto
   ): Promise<FeedbackResponseDto> {
-    return this.orchestratorService.processFeedback(id, feedback);
+    if (!feedback.conversationId) {
+      feedback.conversationId = id;
+    }
+    return this.orchestratorService.processFeedback(feedback);
   }
 }

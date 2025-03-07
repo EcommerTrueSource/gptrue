@@ -44,15 +44,9 @@ export interface ConversationResponse {
 
 export interface ConversationState {
   id: string;
-  userId: string;
   messages: ConversationMessage[];
-  context: Record<string, any>;
-  metadata: {
-    createdAt: Date;
-    updatedAt: Date;
-    totalInteractions: number;
-    lastProcessingTimeMs?: number;
-  };
+  metadata: ConversationMetadata;
+  lastResult?: ProcessingResult;
 }
 
 export interface ConversationMessage {
@@ -60,20 +54,42 @@ export interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  originalQuestion?: string;
   metadata?: MessageMetadata;
   feedback?: MessageFeedback;
 }
 
 export interface MessageMetadata {
+  source: 'cache' | 'generated' | 'error' | 'conversational';
+  confidence?: number;
   processingTimeMs: number;
-  source: 'cache' | 'query';
-  confidence: number;
+  needsReview?: boolean;
   tables?: string[];
   sql?: string;
+  cacheId?: string;
+  isExactMatch?: boolean;
+  originalQuestion?: string;
+  currentQuestion?: string;
+  adaptedFromCache?: boolean;
+  adaptationContext?: {
+    uniqueCurrentTokens?: string[];
+    uniqueOriginalTokens?: string[];
+    currentNumbers?: string[];
+    originalNumbers?: string[];
+    usageCount?: number;
+    feedbackPositive?: number;
+    feedbackNegative?: number;
+    [key: string]: any;
+  };
+  error?: {
+    type: string;
+    details: string;
+  };
 }
 
 export interface MessageFeedback {
   type: FeedbackType;
+  helpful: boolean;
   comment?: string;
   timestamp: Date;
 }
@@ -100,5 +116,17 @@ export interface QueryResult {
 export interface GeneratedResponse {
   message: string;
   metadata: MessageMetadata;
+  data?: {
+    type: 'table' | 'scalar' | 'chart';
+    content: any;
+  };
   suggestions?: string[];
+}
+
+export interface ConversationMetadata {
+  createdAt: Date;
+  updatedAt: Date;
+  totalInteractions: number;
+  lastProcessingTimeMs?: number;
+  hasFeedback?: boolean;
 }

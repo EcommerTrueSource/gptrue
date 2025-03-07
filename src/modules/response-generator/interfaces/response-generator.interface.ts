@@ -33,6 +33,10 @@ export interface QueryResult {
     bytesProcessed: number;
     cacheHit: boolean;
     sql?: string;
+    estimatedCost?: number;
+    originalQuestion?: string;
+    currentQuestion?: string;
+    originalResponse?: string;
   };
 }
 
@@ -99,4 +103,20 @@ export interface OpenAIPrompt {
     user: string;
     assistant: string;
   }[];
+}
+
+export interface GenerateResponseParams {
+  question: string;
+  queryResult?: QueryResult;
+  data?: any;
+  query?: string;
+  tables?: string[];
+  metadata: {
+    startTime: number;
+    adaptFromCache?: boolean;
+  };
+}
+
+export interface IResponseGeneratorService {
+  generateResponse(params: GenerateResponseParams): Promise<any>;
 }

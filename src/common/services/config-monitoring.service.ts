@@ -67,9 +67,9 @@ export class ConfigMonitoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private startMemoryMonitoring() {
-    const intervalMs = this.configService.get<number>('app.monitoring.memoryCheckIntervalMs') || 30000;
-    const warningThreshold = this.configService.get<number>('app.monitoring.memoryWarningThresholdPercent') || 80;
-    const criticalThreshold = this.configService.get<number>('app.monitoring.memoryCriticalThresholdPercent') || 90;
+    const intervalMs = this.configService.get<number>('app.monitoring.memoryCheckIntervalMs') || 60000;
+    const warningThreshold = this.configService.get<number>('app.monitoring.memoryWarningThresholdPercent') || 95;
+    const criticalThreshold = this.configService.get<number>('app.monitoring.memoryCriticalThresholdPercent') || 98;
 
     this.logger.log(`Iniciando monitoramento de memória a cada ${intervalMs}ms com limite de alerta em ${warningThreshold}%`);
 
@@ -112,19 +112,22 @@ export class ConfigMonitoringService implements OnModuleInit, OnModuleDestroy {
           }
         }
 
+        // Só considerar crescente se 4 de 5 snapshots mostrarem crescimento
         isGrowing = growingCount >= 4;
       }
 
       // Registrar uso de memória em nível de debug
       this.logger.debug(`Uso de memória: ${heapUsagePercent.toFixed(2)}% (${this.formatBytes(memoryUsage.heapUsed)}/${this.formatBytes(memoryUsage.heapTotal)})`);
 
-      // Alertar se estiver acima do limite de aviso
-      if (heapUsagePercent > warningThreshold) {
-        this.logger.warn(`Alto uso de memória heap: ${heapUsagePercent.toFixed(2)}% ${isGrowing ? '(CRESCENTE)' : ''}`);
+      // Alertar se estiver acima do limite de aviso E estiver crescendo
+      if (heapUsagePercent > warningThreshold && isGrowing) {
+        this.logger.warn(`Alto uso de memória heap: ${heapUsagePercent.toFixed(2)}% (CRESCENTE)`);
+        this.logDetailedMemoryInfo(memoryUsage, memorySnapshots);
       }
 
       // Ações adicionais se estiver acima do limite crítico
       if (heapUsagePercent > criticalThreshold) {
+        this.logger.error(`USO CRÍTICO de memória heap: ${heapUsagePercent.toFixed(2)}%`);
         this.logDetailedMemoryInfo(memoryUsage, memorySnapshots);
 
         // Sugerir coleta de lixo em ambiente de desenvolvimento

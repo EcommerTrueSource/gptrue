@@ -7,6 +7,7 @@ import { ResponseGeneratorModule } from '../response-generator/response-generato
 import { SemanticCacheModule } from '../semantic-cache/semantic-cache.module';
 import { QueryValidatorModule } from '../query-validator/query-validator.module';
 import { OrchestratorController } from './controllers/orchestrator.controller';
+import { MonitoringModule } from '../../common/monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { OrchestratorController } from './controllers/orchestrator.controller';
     QueryGeneratorModule,
     ResponseGeneratorModule,
     SemanticCacheModule,
-    QueryValidatorModule
+    QueryValidatorModule,
+    MonitoringModule
   ],
   controllers: [OrchestratorController],
   providers: [OrchestratorService],

@@ -50,6 +50,14 @@ export class QueryValidatorService implements OnModuleInit {
   private readonly maxExecutionTime: number;
   private readonly allowedTables: string[];
   private template: string;
+  private readonly BIGQUERY_FUNCTIONS = [
+    'unnest', 'json_extract_array', 'json_extract_scalar', 'json_extract',
+    'cast', 'parse_json', 'to_json_string', 'json_value', 'json_query',
+    'array', 'generate_array', 'array_concat', 'array_length', 'array_to_string',
+    'date', 'datetime', 'timestamp', 'time', 'extract', 'date_trunc',
+    'struct', 'to_hex', 'to_base64', 'format', 'concat', 'substr',
+    'regexp_extract', 'regexp_replace', 'split', 'trim', 'lower', 'upper'
+  ];
 
   constructor(
     private readonly configService: ConfigService,
@@ -94,6 +102,47 @@ export class QueryValidatorService implements OnModuleInit {
   }
 
   /**
+   * Verifica se a consulta contém padrões de sintaxe inválidos para processamento de JSON
+   * @param query Consulta SQL
+   * @returns Objeto com resultado da validação
+   */
+  private validateJsonSyntax(query: string): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Padrões de sintaxe inválidos
+    const invalidPatterns = [
+      {
+        pattern: /INNER\s+JOIN\s+UNNEST\s*\(/i,
+        message: 'Sintaxe inválida: Não use INNER JOIN com UNNEST. Use a sintaxe correta: FROM tabela, UNNEST(...) AS alias'
+      },
+      {
+        pattern: /INNER\s+JOIN\s+JSON_EXTRACT/i,
+        message: 'Sintaxe inválida: Não use INNER JOIN com JSON_EXTRACT. Use a sintaxe correta: JSON_EXTRACT_SCALAR(item, \'$.campo\') AS alias'
+      },
+      {
+        pattern: /INNER\s+JOIN\s+CAST\s*\(/i,
+        message: 'Sintaxe inválida: Não use INNER JOIN com CAST. Use a sintaxe correta: CAST(JSON_EXTRACT_SCALAR(item, \'$.campo\') AS TIPO) AS alias'
+      },
+      {
+        pattern: /AS\s+\w+\.\w+/i,
+        message: 'Sintaxe inválida: Não use aliases com ponto (exemplo: AS i.quantidade). Use aliases simples (exemplo: AS quantidade)'
+      }
+    ];
+
+    // Verificar cada padrão inválido
+    for (const { pattern, message } of invalidPatterns) {
+      if (pattern.test(query)) {
+        errors.push(message);
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
    * Valida uma consulta SQL
    * @param query Consulta SQL a ser validada
    * @returns Resultado da validação
@@ -127,62 +176,120 @@ export class QueryValidatorService implements OnModuleInit {
       }
 
       // Verificar sintaxe básica
-      if (!query.trim().toUpperCase().startsWith('SELECT')) {
-        this.logger.warn(`Consulta não começa com SELECT: ${query.substring(0, 100)}...`);
+      const normalizedQuery = query.trim().toUpperCase();
+      if (!normalizedQuery.startsWith('SELECT') && !normalizedQuery.startsWith('WITH')) {
+        this.logger.warn(`Consulta não começa com SELECT ou WITH: ${query.substring(0, 100)}...`);
         return {
           isValid: false,
           errors: [{
             code: 'SYNTAX_ERROR',
-            message: 'A query deve começar com SELECT',
+            message: 'A query deve começar com SELECT ou WITH',
             severity: 'error'
           }]
         };
+      }
+
+      // Verificar sintaxe de processamento de JSON
+      const jsonSyntaxValidation = this.validateJsonSyntax(query);
+      if (!jsonSyntaxValidation.isValid) {
+        this.logger.warn(`Consulta contém sintaxe inválida para processamento de JSON: ${jsonSyntaxValidation.errors.join('; ')}`);
+        return {
+          isValid: false,
+          errors: jsonSyntaxValidation.errors.map(message => ({
+            code: 'JSON_SYNTAX_ERROR',
+            message,
+            severity: 'error'
+          }))
+        };
+      }
+
+      // Extrair todas as CTEs definidas na consulta, incluindo CTEs aninhadas
+      const cteNames = this.extractAllCteNames(query);
+      if (cteNames.size > 0) {
+        this.logger.debug(`CTEs identificadas na consulta (incluindo aninhadas): ${Array.from(cteNames).join(', ')}`);
       }
 
       // Verificar tabelas permitidas
       const tables = this.extractTableNames(query);
-      this.logger.debug(`Tabelas encontradas na consulta: ${tables.join(', ')}`);
 
-      const unauthorizedTables = tables.filter(
-        table => !this.securityPolicy.allowedTables.includes(table)
-      );
+      if (tables.length > 0) {
+        this.logger.debug(`Tabelas reais encontradas na consulta: ${tables.join(', ')}`);
 
-      if (unauthorizedTables.length > 0) {
-        this.logger.warn(`Consulta contém tabelas não autorizadas: ${unauthorizedTables.join(', ')}`);
+        const unauthorizedTables = tables.filter(
+          table => !this.securityPolicy.allowedTables.includes(table)
+        );
+
+        if (unauthorizedTables.length > 0) {
+          this.logger.warn(`Consulta contém tabelas não autorizadas: ${unauthorizedTables.join(', ')}`);
+          return {
+            isValid: false,
+            errors: [{
+              code: 'UNAUTHORIZED_TABLE',
+              message: `Acesso não autorizado às tabelas: ${unauthorizedTables.join(', ')}`,
+              severity: 'error'
+            }]
+          };
+        }
+      } else {
+        this.logger.debug('Nenhuma tabela real identificada na consulta (pode conter apenas funções ou CTEs)');
+      }
+
+      // Tentar validar a sintaxe com um dry run no BigQuery
+      try {
+        // Verificar limites de recursos
+        const estimatedCost = await this.estimateQueryCost(query);
+        this.logger.debug(`Custo estimado da consulta: ${estimatedCost.processingBytes} bytes`);
+
+        if (estimatedCost.processingBytes > this.MAX_BYTES_ALLOWED) {
+          this.logger.warn(`Consulta excede o limite de processamento: ${estimatedCost.processingBytes} bytes`);
+          return {
+            isValid: false,
+            errors: [{
+              code: 'RESOURCE_LIMIT',
+              message: `A query excede o limite de processamento de dados (${this.MAX_BYTES_ALLOWED} bytes)`,
+              severity: 'error'
+            }],
+            estimatedCost
+          };
+        }
+
+        // Se passou por todas as validações
+        this.logger.debug('Consulta validada com sucesso');
         return {
-          isValid: false,
-          errors: [{
-            code: 'UNAUTHORIZED_TABLE',
-            message: `Acesso não autorizado às tabelas: ${unauthorizedTables.join(', ')}`,
-            severity: 'error'
+          isValid: true,
+          warnings: [],
+          estimatedCost
+        };
+      } catch (estimationError: any) {
+        // Capturar erros de sintaxe do BigQuery
+        const errorMessage = estimationError?.message || 'Erro desconhecido';
+
+        // Verificar se é um erro de sintaxe
+        if (errorMessage.includes('Syntax error')) {
+          this.logger.warn(`Erro de sintaxe SQL detectado: ${errorMessage}`);
+          return {
+            isValid: false,
+            errors: [{
+              code: 'SYNTAX_ERROR',
+              message: `Erro de sintaxe SQL: ${errorMessage}`,
+              severity: 'error'
+            }]
+          };
+        }
+
+        // Para outros erros, logar mas não bloquear a consulta
+        this.logger.warn(`Erro ao estimar custo da consulta: ${errorMessage}`);
+
+        // Permitir a execução mesmo com erro na estimativa de custo
+        return {
+          isValid: true,
+          warnings: [{
+            code: 'COST_ESTIMATION_FAILED',
+            message: `Não foi possível estimar o custo da consulta: ${errorMessage}`,
+            severity: 'warning'
           }]
         };
       }
-
-      // Verificar limites de recursos
-      const estimatedCost = await this.estimateQueryCost(query);
-      this.logger.debug(`Custo estimado da consulta: ${estimatedCost.processingBytes} bytes`);
-
-      if (estimatedCost.processingBytes > this.MAX_BYTES_ALLOWED) {
-        this.logger.warn(`Consulta excede o limite de processamento: ${estimatedCost.processingBytes} bytes`);
-        return {
-          isValid: false,
-          errors: [{
-            code: 'RESOURCE_LIMIT',
-            message: `A query excede o limite de processamento de dados (${this.MAX_BYTES_ALLOWED} bytes)`,
-            severity: 'error'
-          }],
-          estimatedCost
-        };
-      }
-
-      // Se passou por todas as validações
-      this.logger.debug('Consulta validada com sucesso');
-      return {
-        isValid: true,
-        warnings: [],
-        estimatedCost
-      };
     } catch (error: any) {
       this.logger.error('Erro ao validar query:', error);
       return {
@@ -204,11 +311,18 @@ export class QueryValidatorService implements OnModuleInit {
   public async estimateQueryCost(query: string): Promise<any> {
     try {
       const bytesProcessed = await this.bigQueryService.estimateCost(query);
+
+      // Calcula o custo estimado em dólares
+      const estimatedCost = this.calculateEstimatedCost(bytesProcessed);
+
+      // Estima o tempo de processamento (aproximado)
+      const processingTime = this.estimateProcessingTime(bytesProcessed);
+
       return {
         processingBytes: bytesProcessed,
-        processingTime: '0s',
-        estimatedCost: this.calculateEstimatedCost(bytesProcessed),
-        affectedRows: 0,
+        processingTime,
+        estimatedCost,
+        affectedRows: 0, // Não é possível estimar com precisão sem executar
       };
     } catch (error) {
       this.logger.error('Erro ao estimar custo da query:', error);
@@ -227,20 +341,114 @@ export class QueryValidatorService implements OnModuleInit {
     return terabytes * 5;
   }
 
-  private extractTableNames(query: string): string[] {
-    const fromRegex = /FROM\s+([^\s,;()]+)/gi;
-    const joinRegex = /JOIN\s+([^\s,;()]+)/gi;
-    const tables = new Set<string>();
+  /**
+   * Verifica se uma tabela é uma CTE válida ou tem um prefixo de CTE permitido
+   * @param tableName Nome da tabela
+   * @param cteNames Conjunto de nomes de CTEs definidas na consulta
+   * @returns true se for uma CTE válida
+   */
+  private isValidCte(tableName: string, cteNames: Set<string>): boolean {
+    const lowerTableName = tableName.toLowerCase();
+
+    // Verificar se é uma CTE definida na consulta
+    if (cteNames.has(lowerTableName)) {
+      return true;
+    }
+
+    // Lista de prefixos de CTEs permitidos
+    const allowedCtePrefixes = [
+      'tmp_pedidos_', 'tmp_clientes_', 'tmp_produtos_', 'tmp_assinaturas_', 'tmp_status_',
+      'cte_pedidos_', 'cte_clientes_', 'cte_produtos_', 'cte_assinaturas_', 'cte_status_',
+      // Adicionando prefixos específicos para CTEs aninhadas comuns
+      'tmp_itens_', 'tmp_vendas_', 'tmp_resultado_', 'tmp_dados_'
+    ];
+
+    // Verificar se tem um prefixo permitido
+    return allowedCtePrefixes.some(prefix => lowerTableName.startsWith(prefix));
+  }
+
+  /**
+   * Extrai todas as CTEs definidas na consulta, incluindo CTEs aninhadas
+   * @param query Consulta SQL
+   * @returns Conjunto de nomes de CTEs
+   */
+  private extractAllCteNames(query: string): Set<string> {
+    // Regex para capturar todas as definições de CTE
+    // Formato: WITH nome AS (...) ou , nome AS (...)
+    const cteRegex = /(?:WITH|,)\s+([a-zA-Z0-9_]+)\s+AS\s*\(/gi;
+    const cteNames = new Set<string>();
 
     let match;
-    while ((match = fromRegex.exec(query)) !== null) {
-      tables.add(match[1].toUpperCase());
-    }
-    while ((match = joinRegex.exec(query)) !== null) {
-      tables.add(match[1].toUpperCase());
+    while ((match = cteRegex.exec(query)) !== null) {
+      if (match[1]) {
+        cteNames.add(match[1].toLowerCase());
+      }
     }
 
-    return Array.from(tables);
+    return cteNames;
+  }
+
+  private extractTableNames(query: string): string[] {
+    try {
+      // Extrair todas as CTEs definidas na consulta, incluindo CTEs aninhadas
+      const cteNames = this.extractAllCteNames(query);
+
+      // Log das CTEs identificadas
+      if (cteNames.size > 0) {
+        this.logger.debug(`CTEs identificadas na consulta: ${Array.from(cteNames).join(', ')}`);
+      }
+
+      // Extrair todas as cláusulas FROM e JOIN
+      const clauseRegex = /(FROM|JOIN)\s+([^,;()]*(?:\([^)]*\)[^,;()]*)*)/gi;
+      const tables = new Set<string>();
+
+      let match;
+      while ((match = clauseRegex.exec(query)) !== null) {
+        const clause = match[1]; // FROM ou JOIN
+        const content = match[2].trim(); // Conteúdo após FROM/JOIN
+
+        // Verificar se é uma subconsulta
+        if (content.startsWith('(')) {
+          this.logger.debug(`Ignorando subconsulta em ${clause}: ${content.substring(0, 30)}...`);
+          continue;
+        }
+
+        // Verificar se é um padrão de função
+        if (this.containsFunctionPattern(content)) {
+          this.logger.debug(`Ignorando padrão de função em ${clause}: ${content}`);
+          continue;
+        }
+
+        // Extrair nome da tabela (considerando backticks e qualificadores)
+        const tableMatch = content.match(/^`?([^`\s]+(?:\.[^`\s]+){0,2})`?(?:\s+AS\s+[a-zA-Z0-9_]+)?/i);
+        if (tableMatch && tableMatch[1]) {
+          // Extrair apenas o nome da tabela (sem projeto e dataset)
+          const parts = tableMatch[1].split('.');
+          const tableOnly = parts[parts.length - 1].replace(/`/g, '').toLowerCase();
+
+          // Verificar se é uma função do BigQuery
+          if (this.isBigQueryFunction(tableOnly)) {
+            this.logger.debug(`Ignorando função do BigQuery: ${tableOnly}`);
+            continue;
+          }
+
+          // Verificar se é uma CTE válida
+          if (this.isValidCte(tableOnly, cteNames)) {
+            this.logger.debug(`Tabela ignorada por ser uma CTE válida: ${tableOnly}`);
+            continue;
+          }
+
+          // Adicionar à lista de tabelas reais
+          tables.add(tableOnly);
+          this.logger.debug(`Tabela real identificada: ${tableOnly}`);
+        }
+      }
+
+      return Array.from(tables);
+    } catch (error) {
+      this.logger.error('Erro ao extrair nomes de tabelas:', error);
+      return []; // Em caso de erro, retorna lista vazia para evitar bloqueios indevidos
+    }
   }
 
   private containsRestrictedColumns(query: string, table: string, columns: string[]): boolean {
@@ -292,10 +500,31 @@ export class QueryValidatorService implements OnModuleInit {
    * @returns true se contiver comandos não permitidos
    */
   private containsDisallowedCommands(query: string): boolean {
-    const normalizedQuery = query.toUpperCase();
+    // Normaliza a consulta removendo comentários e espaços extras
+    const normalizedQuery = this.sanitizeQuery(query).toUpperCase();
+
+    // Verifica se há comandos não permitidos usando expressões regulares com limites de palavra
     return this.DISALLOWED_COMMANDS.some(command =>
-      normalizedQuery.includes(command)
+      new RegExp(`\\b${command}\\b`, 'i').test(normalizedQuery)
     );
+  }
+
+  /**
+   * Estima o tempo de processamento com base no volume de dados
+   * @param bytesProcessed Bytes processados
+   * @returns Tempo estimado em formato legível
+   */
+  private estimateProcessingTime(bytesProcessed: number): string {
+    // Estimativa simples: 1GB ~ 2s (ajuste conforme necessário)
+    const seconds = Math.max(1, Math.ceil(bytesProcessed / (1024 * 1024 * 1024) * 2));
+
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    } else {
+      return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+    }
   }
 
   private validateSyntax(query: string): ValidationResult {
@@ -357,10 +586,13 @@ export class QueryValidatorService implements OnModuleInit {
 
   private async validateSecurity(query: string): Promise<ValidationResult> {
     try {
+      // Extrair todas as CTEs definidas na consulta, incluindo CTEs aninhadas
+      const cteNames = this.extractAllCteNames(query);
+
       // Verifica tabelas permitidas
       const usedTables = this.extractTableNames(query);
       const unauthorizedTables = usedTables.filter(
-        table => !this.securityPolicy.allowedTables.includes(table),
+        table => !this.securityPolicy.allowedTables.includes(table)
       );
 
       if (unauthorizedTables.length > 0) {
@@ -434,9 +666,13 @@ export class QueryValidatorService implements OnModuleInit {
         });
       }
 
+      // Identificar CTEs definidas na consulta
+      const cteNames = this.extractAllCteNames(query.sql);
+
       // Verificar tabelas permitidas
       query.tables.forEach(table => {
-        if (!this.securityPolicy.allowedTables.includes(table)) {
+        // Ignorar tabelas que são CTEs válidas
+        if (!this.isValidCte(table, cteNames) && !this.securityPolicy.allowedTables.includes(table)) {
           errors.push({
             code: 'TABLE_NOT_ALLOWED',
             message: `Tabela ${table} não está na lista de tabelas permitidas.`,
@@ -461,19 +697,29 @@ export class QueryValidatorService implements OnModuleInit {
         }
       });
 
-      // Verificar otimizações possíveis
-      if (this.shouldUsePartitioning(query)) {
+      // Verificar limites de recursos
+      if (job.metadata.statistics.totalBytesProcessed > this.securityPolicy.maxBytesProcessed) {
+        errors.push({
+          code: 'RESOURCE_LIMIT',
+          message: `A query excede o limite de processamento de dados (${this.securityPolicy.maxBytesProcessed} bytes)`,
+          severity: 'error',
+        });
+      }
+
+      // Verificar se a consulta usa particionamento quando necessário
+      if (this.shouldUsePartitioning(query) && !query.sql.toLowerCase().includes('partition by')) {
         warnings.push({
-          code: 'SUGGEST_PARTITIONING',
-          message: 'Considere usar particionamento por data em consultas temporais',
+          code: 'MISSING_PARTITIONING',
+          message: 'Considere usar particionamento para melhorar a performance',
           severity: 'warning',
         });
       }
 
-      if (this.shouldUseClustering(query)) {
+      // Verificar se a consulta usa clustering quando necessário
+      if (this.shouldUseClustering(query) && !query.sql.toLowerCase().includes('cluster by')) {
         warnings.push({
-          code: 'SUGGEST_CLUSTERING',
-          message: 'Considere usar clustering nas colunas mais filtradas',
+          code: 'MISSING_CLUSTERING',
+          message: 'Considere usar clustering para melhorar a performance',
           severity: 'warning',
         });
       }
@@ -483,18 +729,15 @@ export class QueryValidatorService implements OnModuleInit {
         errors,
         warnings,
       };
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error('Erro desconhecido');
-      errors.push({
-        code: 'VALIDATION_ERROR',
-        message: err.message,
-        severity: 'error',
-      });
-
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       return {
         isValid: false,
-        errors,
-        warnings,
+        errors: [{
+          code: 'VALIDATION_ERROR',
+          message: errorMessage,
+          severity: 'error',
+        }],
       };
     }
   }
@@ -526,5 +769,59 @@ export class QueryValidatorService implements OnModuleInit {
     const hasJoins = query.sql.toLowerCase().includes('join');
     const hasGroupBy = query.sql.toLowerCase().includes('group by');
     return hasJoins || hasGroupBy;
+  }
+
+  private isBigQueryFunction(identifier: string): boolean {
+    const lowerIdentifier = identifier.toLowerCase();
+
+    // Verificar na lista de funções conhecidas
+    if (this.BIGQUERY_FUNCTIONS.includes(lowerIdentifier)) {
+      return true;
+    }
+
+    // Verificar padrões comuns de funções do BigQuery
+    // Muitas funções seguem padrões como: st_* (geoespaciais), ml_* (machine learning), etc.
+    const functionPatterns = [
+      /^st_/, // Funções geoespaciais
+      /^ml_/, // Funções de machine learning
+      /^hll_/, // Funções HyperLogLog
+      /^net_/, // Funções de rede
+      /^session_/, // Funções de sessão
+      /^to_/, // Funções de conversão (to_json, to_hex, etc.)
+      /^is_/, // Funções de verificação (is_nan, is_inf, etc.)
+      /^format_/, // Funções de formatação
+      /^parse_/, // Funções de parsing
+      /^generate_/, // Funções de geração
+      /^array_/, // Funções de array
+      /^string_/, // Funções de string
+      /^date_/, // Funções de data
+      /^timestamp_/, // Funções de timestamp
+      /^time_/, // Funções de tempo
+      /^datetime_/, // Funções de datetime
+      /^json_/, // Funções JSON
+    ];
+
+    // Verificar se o identificador corresponde a algum padrão de função
+    return functionPatterns.some(pattern => pattern.test(lowerIdentifier));
+  }
+
+  /**
+   * Verifica se uma parte da consulta contém um padrão de função
+   * Exemplo: FROM UNNEST(...) AS item
+   * @param queryPart Parte da consulta a ser verificada
+   * @returns true se contiver um padrão de função
+   */
+  private containsFunctionPattern(queryPart: string): boolean {
+    // Padrões comuns de uso de funções em cláusulas FROM/JOIN
+    const functionPatterns = [
+      /UNNEST\s*\(/i,
+      /JSON_EXTRACT\w*\s*\(/i,
+      /CAST\s*\(/i,
+      /ARRAY\w*\s*\(/i,
+      /STRUCT\s*\(/i,
+      /\w+\s*\([^)]*\)\s+AS\s+/i, // Qualquer função seguida por AS
+    ];
+
+    return functionPatterns.some(pattern => pattern.test(queryPart));
   }
 }

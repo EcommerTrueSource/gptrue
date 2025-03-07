@@ -5,13 +5,17 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { OrchestratorService } from '../../orchestrator/services/orchestrator.service';
 import { ConversationRequestDto, ConversationResponseDto } from '../dtos/conversation.dto';
-import { FeedbackRequestDto, FeedbackResponseDto } from '../dtos/feedback-request.dto';
+import { FeedbackRequestDto, FeedbackResponseDto, FeedbackType } from '../dtos/feedback-request.dto';
+import { SimpleFeedbackDto } from '../dtos/simple-feedback.dto';
+import { Logger } from '@nestjs/common';
 
 @ApiTags('Conversação')
 @Controller('conversation')
 @UseGuards(MockAuthGuard, RolesGuard)
 @ApiBearerAuth('access-token')
 export class ConversationController {
+  private readonly logger = new Logger(ConversationController.name);
+
   constructor(private readonly orchestratorService: OrchestratorService) {}
 
   @Post()
@@ -107,41 +111,46 @@ export class ConversationController {
   @Put(':id/feedback')
   @Roles('user')
   @ApiOperation({
-    summary: 'Envia feedback sobre uma resposta',
-    description: `
-      Registra o feedback do usuário sobre uma resposta específica.
-      O feedback ajuda a melhorar a qualidade das respostas futuras.
-
-      ## Tipos de Feedback
-      - Positivo: Resposta útil e correta
-      - Negativo: Resposta incorreta ou insuficiente
-      - Neutro: Resposta parcialmente útil
-
-      ## Impacto do Feedback
-      - Atualização do cache semântico
-      - Ajuste de templates de resposta
-      - Geração de métricas de qualidade
-      - Identificação de áreas para melhoria
-    `
+    summary: 'Enviar feedback para uma resposta',
+    description: 'Permite que o usuário forneça feedback sobre uma resposta específica',
   })
   @ApiParam({
     name: 'id',
     description: 'ID da conversa',
-    example: 'conv_123456789'
+    type: String,
   })
   @ApiBody({
-    type: FeedbackRequestDto,
-    description: 'Dados do feedback'
+    type: SimpleFeedbackDto,
+    description: 'Dados do feedback',
   })
   @ApiResponse({
     status: 200,
     description: 'Feedback processado com sucesso',
-    type: FeedbackResponseDto
+    type: FeedbackResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dados de feedback inválidos',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Conversa ou resposta não encontrada',
   })
   async sendFeedback(
     @Param('id') id: string,
-    @Body() feedback: FeedbackRequestDto
-  ) {
-    return this.orchestratorService.processFeedback(id, feedback);
+    @Body() simpleFeedback: SimpleFeedbackDto,
+  ): Promise<FeedbackResponseDto> {
+    this.logger.log(`Recebendo feedback para conversa ${id}`);
+
+    // Converter SimpleFeedbackDto para FeedbackRequestDto
+    const feedback: FeedbackRequestDto = {
+      conversationId: id,
+      responseId: simpleFeedback.messageId,
+      type: simpleFeedback.type,
+      helpful: simpleFeedback.type === 'positive',
+      comment: simpleFeedback.comment,
+    };
+
+    return this.orchestratorService.processFeedback(feedback);
   }
 }

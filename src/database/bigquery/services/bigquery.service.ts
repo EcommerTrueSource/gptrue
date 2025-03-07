@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery, Query } from '@google-cloud/bigquery';
 import * as path from 'path';
 import { IBigQueryService, QueryResult } from '../interfaces/bigquery.interface';
+import { BigQueryExecutionError } from '../errors/bigquery-execution.error';
+import { QueryOptions } from '../interfaces/bigquery.interface';
+import { DryRunResult } from '../../../modules/query-validator/interfaces/query-validator.interface';
 
 @Injectable()
 export class BigQueryService implements IBigQueryService {
@@ -66,26 +69,54 @@ export class BigQueryService implements IBigQueryService {
 
   async executeQuery<T = any>(query: string, params?: Record<string, any>): Promise<QueryResult<T>> {
     const startTime = Date.now();
+    this.logger.debug(`Executando query no BigQuery: ${query.substring(0, 200)}${query.length > 200 ? '...' : ''}`);
+
     try {
-      const [rows] = await this.bigquery.query({
+      // Primeiro, estimar o custo da consulta
+      const bytesProcessed = await this.estimateCost(query);
+      this.logger.debug(`Custo estimado da query: ${bytesProcessed} bytes`);
+
+      // Configurar opções da consulta
+      const queryOptions = {
         query,
         params,
         location: 'US',
-      });
+        maximumBytesBilled: '1000000000', // 1GB como limite padrão
+        timeoutMs: 60000, // 60 segundos como timeout padrão
+      };
+
+      // Executar a consulta
+      const [rows] = await this.bigquery.query(queryOptions);
 
       const executionTime = Date.now() - startTime;
+      this.logger.debug(`Query executada com sucesso em ${executionTime}ms. Retornando ${rows.length} linhas.`);
 
       return {
         rows: rows as T[],
         metadata: {
           totalRows: rows.length,
-          processedBytes: 0, // Não é possível obter esse valor após a execução
+          processedBytes: bytesProcessed,
           executionTimeMs: executionTime,
         },
       };
     } catch (error) {
-      this.logger.error(`Erro ao executar query: ${error instanceof Error ? error.message : String(error)}`);
-      throw new Error(`Erro ao executar query: ${error instanceof Error ? error.message : String(error)}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const executionTime = Date.now() - startTime;
+
+      this.logger.error(`Erro ao executar query após ${executionTime}ms: ${errorMessage}`);
+
+      // Classificar o erro para melhor diagnóstico
+      if (errorMessage.includes('timeout')) {
+        throw new BigQueryExecutionError('A consulta excedeu o tempo limite de execução', query, error instanceof Error ? error : new Error(errorMessage));
+      } else if (errorMessage.includes('quota')) {
+        throw new BigQueryExecutionError('Cota do BigQuery excedida', query, error instanceof Error ? error : new Error(errorMessage));
+      } else if (errorMessage.includes('syntax')) {
+        throw new BigQueryExecutionError('Erro de sintaxe na consulta SQL', query, error instanceof Error ? error : new Error(errorMessage));
+      } else if (errorMessage.includes('permission')) {
+        throw new BigQueryExecutionError('Erro de permissão no BigQuery', query, error instanceof Error ? error : new Error(errorMessage));
+      } else {
+        throw new BigQueryExecutionError(`Erro ao executar query: ${errorMessage}`, query, error instanceof Error ? error : new Error(errorMessage));
+      }
     }
   }
 

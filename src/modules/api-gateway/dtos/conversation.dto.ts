@@ -9,6 +9,9 @@ import {
   IsArray,
   IsEnum,
   IsDateString,
+  IsIn,
+  Min,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -140,19 +143,38 @@ export class ConversationRequestDto {
   options?: QueryOptionsDto;
 }
 
+export class ErrorDetailsDto {
+  @ApiProperty({
+    description: 'Tipo do erro',
+    example: 'SQLExecutionError'
+  })
+  @IsString()
+  type: string;
+
+  @ApiProperty({
+    description: 'Detalhes do erro',
+    example: 'Erro ao executar a query SQL'
+  })
+  @IsString()
+  details: string;
+}
+
 export class QueryMetadataDto {
   @ApiProperty({
     description: 'Tempo de processamento em milissegundos',
-    example: 245
+    example: 350
   })
+  @IsNumber()
   processingTimeMs: number;
 
   @ApiProperty({
-    description: 'Fonte da resposta (cache ou consulta)',
-    example: 'cache',
-    enum: ['cache', 'query']
+    description: 'Fonte da resposta',
+    enum: ['cache', 'query', 'error', 'generated', 'development', 'conversational'],
+    example: 'query'
   })
-  source: 'cache' | 'query';
+  @IsString()
+  @IsIn(['cache', 'query', 'error', 'generated', 'development', 'conversational'])
+  source: 'cache' | 'query' | 'error' | 'generated' | 'development' | 'conversational';
 
   @ApiProperty({
     description: 'Nível de confiança na resposta (0-1)',
@@ -160,23 +182,33 @@ export class QueryMetadataDto {
     minimum: 0,
     maximum: 1
   })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
   confidence: number;
 
   @ApiPropertyOptional({
     description: 'Tabelas utilizadas na consulta',
     example: ['PEDIDOS', 'PRODUTOS']
   })
-  @IsArray()
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   tables?: string[];
 
   @ApiPropertyOptional({
-    description: 'Query SQL gerada (se solicitado)',
-    example: 'SELECT produto, COUNT(*) as total FROM pedidos GROUP BY produto LIMIT 5'
+    description: 'Consulta SQL executada',
+    example: 'SELECT * FROM PEDIDOS WHERE data > "2023-01-01"'
   })
-  @IsString()
   @IsOptional()
+  @IsString()
   sql?: string;
+
+  @ApiPropertyOptional({
+    description: 'Detalhes do erro (se houver)',
+    type: ErrorDetailsDto
+  })
+  error?: ErrorDetailsDto;
 }
 
 export class ConversationResponseDto {

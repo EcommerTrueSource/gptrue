@@ -128,12 +128,20 @@ export class AdminTemplateDto implements Template {
     description: 'Feedback recebido',
     example: {
       positive: 45,
-      negative: 3
+      negative: 3,
+      comments: ['Excelente resposta', 'Muito útil'],
+      needsReview: false,
+      categories: ['vendas', 'produtos'],
+      lastFeedbackDate: '2024-02-26T15:30:00Z'
     }
   })
   feedback!: {
     positive: number;
     negative: number;
+    comments: string[];
+    needsReview: boolean;
+    categories?: string[];
+    lastFeedbackDate?: string;
   };
 }
 
